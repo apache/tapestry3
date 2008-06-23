@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!-- $Id$ -->
+<project name="Tapestry Framework" default="install">
+	<property name="root.dir" value=".."/>
+	<property file="${root.dir}/config/Version.properties"/>
+	<property file="${root.dir}/config/common.properties"/>
+	<property file="${root.dir}/config/build.properties"/>
+	
+	<path id="project.class.path">
+		<fileset dir="${root.lib.dir}">
+			<include name="${ext.dir}/*.jar"/>
+		</fileset>
+		<fileset dir="${root.lib.dir}">
+			<include name="${j2ee.dir}/*.jar"/>
+		</fileset>
+	</path>
+	<target name="init">
+		<mkdir dir="${classes.dir}"/>
+	</target>
+	<target name="clean">
+		<delete dir="${classes.dir}"/>
+	</target>
+
+	<target name="compile" depends="init"
+		description="Compile all classes in the framework.">
+		<javac srcdir="${src.dir}" destdir="${classes.dir}" debug="on"
+			target="1.1" source="1.3">
+			<classpath refid="project.class.path"/>
+		</javac>
+	</target>
+	<target name="install" depends="compile"
+		description="Compile all classes and build the installed JAR including all package resources."
+		>
+		<copy file="${root.dir}/config/Version.properties"
+			todir="${classes.dir}/org/apache/tapestry"/>
+		<jar jarfile="${root.lib.dir}/${framework.jar}">
+			<fileset dir="${classes.dir}">
+			</fileset>
+
+			<fileset dir="${src.dir}">
+				<exclude name="**/*.java"/>
+				<exclude name="**/package.html"/>
+			</fileset>
+			
+			<metainf dir="META-INF">
+				<include name="*"/>
+			</metainf>
+		</jar>
+
+	</target>
+</project>

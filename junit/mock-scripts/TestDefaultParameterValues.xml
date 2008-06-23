@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- $Id$ -->
+<!--
+   Copyright 2004 The Apache Software Foundation
+  
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<mock-test>
+    <context name="c27" root="context27"/>
+
+  	<servlet name="app" class="org.apache.tapestry.ApplicationServlet"/>
+
+	<request>
+		<assert-output name="Page Title">
+<![CDATA[		
+<title>Home</title>
+]]>
+		</assert-output>
+  	  	  	
+
+		<assert-output name="bound int value">
+<![CDATA[
+<td>Bound intValue    = 10</td>
+]]>
+		</assert-output>
+
+		<assert-output name="bound double value">
+<![CDATA[
+<td>Bound doubleValue = 2.72</td>
+]]>
+		</assert-output>
+
+		<assert-output name="bound object value">
+<![CDATA[
+<td>Bound objectValue = zh_TW</td>
+]]>
+		</assert-output>
+
+		<assert-output name="bound boolean value">
+<![CDATA[
+<td>Bound booleanValue = true</td>
+]]>
+		</assert-output>
+
+
+		<assert-output name="default int value">
+<![CDATA[
+<td>Default intValue    = 5</td>
+]]>
+		</assert-output>
+
+		<assert-output name="default double value">
+<![CDATA[
+<td>Default doubleValue = 3.14</td>
+]]>
+		</assert-output>
+
+		<assert-output name="default object value">
+<![CDATA[
+<td>Default objectValue = en_US</td>
+]]>
+		</assert-output>
+
+		<assert-output name="default boolean value">
+<![CDATA[
+<td>Default booleanValue = false</td>
+]]>
+		</assert-output>
+
+
+
+
+		<assert-output name="span tag">
+<![CDATA[
+<span>span tag</span>
+]]>
+		</assert-output>
+
+		<assert-output name="div tag">
+<![CDATA[
+<div>div tag</div>
+]]>
+		</assert-output>
+		
+		<assert-output name="b tag">
+<![CDATA[
+<b>b tag</b>
+]]>
+		</assert-output>
+		
+		<assert-output name="i tag">
+<![CDATA[
+<i>i tag</i>
+]]>
+		</assert-output>
+		
+	</request>
+
+
+	<request>
+		<parameter name="service" value="page/Two"/>	
+
+		<assert-output name="Page Title">
+<![CDATA[		
+<title>Exception</title>
+]]>
+		</assert-output>
+  	  	  	
+
+		<assert-output name="parameter must have default value">
+<![CDATA[
+Parameter 'intValue' must be required or have a default value as it uses direction 'auto'.
+]]>
+		</assert-output>
+	</request>
+
+		
+	<request>
+		<parameter name="service" value="page/Three"/>
+
+		<assert-output name="Page Title">
+<![CDATA[		
+<title>Exception</title>
+]]>
+		</assert-output>
+  	  	  	
+
+		<assert-output name="required parameter must not have default value">
+<![CDATA[
+Parameter intValue of component Three/$Bad2 is required and must not have a default value.
+]]>
+		</assert-output>
+	</request>
+		
+ </mock-test>

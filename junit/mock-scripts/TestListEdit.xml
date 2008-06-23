@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- $Id$ -->
+<!--
+   Copyright 2004 The Apache Software Foundation
+  
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<mock-test>
+    <context name="c14" root="context14"/>
+
+  	<servlet name="app" class="org.apache.tapestry.ApplicationServlet"/>
+
+	<request>
+		<parameter name="service" value="page/ListEdit"/>
+		
+		<assert-output name="Page Title">
+<![CDATA[
+<title>ListEdit</title>
+]]>	
+		</assert-output>
+		
+		<assert-output-matches name="Hidden Fields" subgroup="1">
+<![CDATA[
+<input type="hidden" (name="(.*?)" value="(.*?)")/>
+]]>
+			<match>name="service" value="direct/0/ListEdit/form"</match>
+			<match>name="sp" value="S0"</match>
+			<match>name="Form0" value="e,inputColor,inputColor$0,inputColor$1"</match>			
+			<match>name="e" value="SClothing"</match>
+			<match>name="e" value="SEye Color"</match>
+			<match>name="e" value="SFood"</match>
+		</assert-output-matches>
+
+	
+		<assert-output-matches name="Selected Options">
+<![CDATA[
+<option value=".*?" selected="selected">.*?</option>
+]]>
+			<match><![CDATA[ <option value="4" selected="selected">Black</option> ]]></match>
+			<match><![CDATA[ <option value="2" selected="selected">Blue</option> ]]></match>
+			<match><![CDATA[ <option value="0" selected="selected">Red</option> ]]></match>
+				
+		</assert-output-matches>
+	</request>
+	
+	<request>
+		<parameter name="service" value="direct/0/ListEdit/form"/>
+		<parameter name="sp" value="S0"/>
+		<parameter name="e">
+			<value>Clothing</value>
+			<value>SEye Color</value>
+			<value>SFood</value>
+		</parameter>
+		<parameter name="inputColor" value="3"/>
+		<parameter name="inputColor$0" value="0"/>
+		<parameter name="inputColor$1" value="2"/>
+		<parameter name="Form0" value="e,inputColor,inputColor$0,inputColor$1"/>
+		
+		<assert-output name="Page Title">
+<![CDATA[
+<title>ListEdit Results</title>
+]]>	
+		</assert-output>
+		
+		<assert-output-matches name="Selected Colors" subgroup="1">
+<![CDATA[
+<td>(.*?)</td>
+]]>
+			<match>Yellow</match>
+			<match>Red</match>
+			<match>Blue</match>
+		</assert-output-matches>
+	</request>	
+	
+	<!-- Hack the submission so that one of the values passed up can't be unsqueezed. -->
+	
+	<request>
+		<parameter name="service" value="direct/0/ListEdit/form"/>
+		<parameter name="sp" value="S0"/>
+		<parameter name="e">
+			<value>3Clothing</value>
+			<value>SEye Color</value>
+			<value>SFood</value>
+		</parameter>
+		<parameter name="inputColor" value="3"/>
+		<parameter name="inputColor$0" value="0"/>
+		<parameter name="inputColor$1" value="2"/>
+		<parameter name="Form0" value="e,inputColor,inputColor$0,inputColor$1"/>
+		
+		<assert-output name="Page Title">
+<![CDATA[
+<title>Exception</title>
+]]>	
+		</assert-output>
+		
+		<assert-output name="Exception">
+		org.apache.tapestry.ApplicationRuntimeException
+		</assert-output>
+		
+		<!-- JDK 1.4 changes this message to:
+			   		For input string: "3Clothing"	
+			   -->
+		<assert-output name="Outer Message">
+		3Clothing	
+		</assert-output>
+		
+		<assert-output name="Inner Exception">
+		java.lang.NumberFormatException			
+		</assert-output>
+
+	</request>		
+	
+	<!-- Test the index and listener parameters, and using an array
+		 as the source. -->
+	
+	<request>
+		<parameter name="service" value="page/ListEditArray"/>
+		
+		<assert-output name="Page Title">
+<![CDATA[
+<title>ListEdit Array</title>
+]]>				
+		</assert-output>
+		
+		<assert-output-matches name="Hidden Fields" subgroup="1">
+<![CDATA[
+<input type="hidden" (name="(.*?)" value="(.*?)")/>
+]]>
+			<match>name="service" value="direct/0/ListEditArray/$ListEditForm.$Form"</match>
+			<match>name="sp" value="S0"</match>
+			<match>name="Form0" value="e"</match>			
+			<match>name="e" value="SFred"</match>
+			<match>name="e" value="SDino"</match>
+			<match>name="e" value="SWilma"</match>
+		</assert-output-matches>			
+	</request>
+	
+	<!-- Test where the ListEdit gets a null source. -->
+	
+	<request>
+		<parameter name="service" value="page/ListEditNull"/>
+		
+		<assert-output name="Page Title">
+<![CDATA[
+<title>ListEdit Null</title>
+]]>				
+		</assert-output>
+		
+		<assert-output-matches name="Hidden Fields" subgroup="1">
+<![CDATA[
+<input type="hidden" (name="(.*?)" value="(.*?)")/>
+]]>
+			<match>name="service" value="direct/0/ListEditNull/$ListEditForm.$Form"</match>
+			<match>name="sp" value="S0"</match>
+			<match>name="Form0" value="e"</match>
+		</assert-output-matches>			
+	</request>	
+</mock-test>

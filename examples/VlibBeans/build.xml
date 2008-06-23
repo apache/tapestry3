@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!-- $Id$ -->
+<project name="Tapestry VlibBeans Example" default="install">
+	<property name="root.dir" value="../.."/>
+	<property file="${root.dir}/config/Version.properties"/>
+	<property file="${root.dir}/config/build.properties"/>
+	<property file="${root.dir}/config/common.properties"/>
+	<path id="jetty.classpath">
+		<fileset dir="${jetty.dir}">
+			<include name="**/javax.*.jar"/>
+		</fileset>
+	</path>
+	<path id="compile.classpath">
+		<fileset dir="${root.lib.dir}">
+			<include name="${ext.dir}/*.jar"/>
+			<include name="${j2ee.dir}/*.jar"/>
+			<include name="*.jar"/>
+		</fileset>
+	</path>
+	<target name="init">
+		<mkdir dir="${classes.dir}"/>
+	</target>
+	<target name="clean">
+		<delete dir="${classes.dir}"/>
+	</target>
+	<target name="compile" depends="init"
+		description="Compile all classes in the JAR.">
+		<javac srcdir="${src.dir}" destdir="${classes.dir}" debug="on"
+			target="1.1" source="1.3">
+			<classpath refid="compile.classpath"/>
+		</javac>
+	</target>
+	<!-- No particular need to use the ejbjar task here, this project isolates all the
+       VlibBeans related code into one place, so there's no need to "reconstruct" what's
+       needed from the deployment descriptors. -->
+	<target name="install" depends="compile"
+		description="Compile all classes and build the installed JAR including all package resources."
+		>
+		<mkdir dir="${examples.dir}"/>		
+		<jar jarfile="${examples.dir}/${vlibbeans.jar}">
+			<fileset dir="${classes.dir}"/>
+			<metainf dir=".">
+				<include name="*.xml"/>
+				<exclude name="build.xml"/>
+			</metainf>
+		</jar>
+	</target>
+</project>
