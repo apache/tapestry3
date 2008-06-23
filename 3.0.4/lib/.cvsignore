@@ -1,0 +1,4 @@
+*.war
+*.jar
+*.ear
+examples
