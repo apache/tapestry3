@@ -1,0 +1,22 @@
+<html jwcid="@Shell" title="Home">
+<body jwcid="@Body">
+
+<a jwcid="first@DirectLink" listener="ognl:listeners.link">First</a>
+
+<br/>
+
+<a jwcid="second@DirectLink" renderer="ognl:beans.absoluteRenderer" listener="ognl:listeners.link">Second</a>
+
+<br/>
+
+Expecting: <span jwcid="@Insert" value="ognl:beans.configuredRenderer.scheme"/>://<span jwcid="@Insert" value="ognl:beans.configuredRenderer.serverName"/>:<span jwcid="@Insert" value="ognl:beans.configuredRenderer.port"/>
+
+
+<a jwcid="third@DirectLink" renderer="ognl:beans.configuredRenderer" listener="ognl:listeners.link" anchor="myanchor">Third</a>
+
+<br/>
+
+[<a jwcid="@DirectLink" disabled="true" listener="ognl:listeners.link">Fourth</a>]
+
+</body>
+</html>
