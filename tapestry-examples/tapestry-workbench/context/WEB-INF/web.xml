@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!--$Id$ -->
+<!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+ "http://java.sun.com/dtd/web-app_2_3.dtd">
+<web-app>
+  <display-name>Tapestry Workbench Example</display-name>
+  
+	<filter>
+		<filter-name>redirect</filter-name>
+		<filter-class>org.apache.tapestry.RedirectFilter</filter-class>
+	</filter>
+	
+	<filter-mapping>
+		<filter-name>redirect</filter-name>
+		<url-pattern>/</url-pattern>
+	</filter-mapping>
+  
+  <servlet>
+  	<servlet-name>workbench</servlet-name>
+    <servlet-class>org.apache.tapestry.ApplicationServlet</servlet-class>
+  	<load-on-startup>0</load-on-startup>
+  </servlet>
+     
+  <servlet-mapping>
+  	<servlet-name>workbench</servlet-name>
+  	<url-pattern>/app</url-pattern>
+  </servlet-mapping>  
+
+  <session-config>
+  	<session-timeout>15</session-timeout>
+  </session-config>
+
+  <taglib>
+  	<taglib-uri>http://jakarta.apache.org/tapestry/tld/tapestry_1_0.tld</taglib-uri>
+  	<taglib-location>/WEB-INF/lib/tapestry-framework-3.0.5-SNAPSHOT.jar</taglib-location>
+  </taglib>
+</web-app>

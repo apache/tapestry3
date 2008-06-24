@@ -44,7 +44,7 @@
 	
 	<path id="vlib.classpath">
 		<pathelement location="${vlibbeans.jar}"/>
-		<pathelement location="examples/VlibBeans/jboss"/>
+		<pathelement location="tapestry-examples/VlibBeans/jboss"/>
 		<pathelement location="${jboss.client.dir}/jboss-j2ee.jar"/>
 		<pathelement location="${jboss.client.dir}/jboss-client.jar"/>
 		<pathelement location="${jboss.client.dir}/jnp-client.jar"/>
@@ -55,7 +55,7 @@
 		<ant dir="framework" target="clean"/>
 		<ant dir="contrib" target="clean"/>
 		<ant dir="junit" target="clean"/>
-		<ant dir="examples" target="clean"/>
+		<ant dir="tapestry-examples" target="clean"/>
 		<ant dir="doc/src" target="clean"/>
 		<delete dir="${private.dir}" quiet="true"/>		
 	</target>
@@ -80,19 +80,19 @@
      	 doesn't override definitions in each project's buildfile. -->
 		<ant dir="framework" target="install" inheritAll="false"/>
 		<ant dir="contrib" target="install" inheritAll="false"/>
-		<ant dir="examples" target="install" inheritAll="false"/>
+		<ant dir="tapestry-examples" target="install" inheritAll="false"/>
 	</target>
 	
 	<target name="build-workbench" description="Builds and installs the Workbench demo."
 		depends="download-ext-framework">
-		<ant dir="examples/Workbench" target="install" inheritAll="false"/>
+		<ant dir="tapestry-examples/tapestry-workbench" target="install" inheritAll="false"/>
 	</target>
 	
 	<target name="build-vlib" description="Builds and installs the Virtual Library demo."
 		depends="download-ext-framework,check-for-jboss-dir">
-		<ant dir="examples/VlibBeans" target="install" inheritAll="false"/>
-		<ant dir="examples/Vlib" target="install" inheritAll="false"/>
-		<ant dir="examples/VlibEAR" target="install" inheritAll="false"/>		
+		<ant dir="tapestry-examples/VlibBeans" target="install" inheritAll="false"/>
+		<ant dir="tapestry-examples/Vlib" target="install" inheritAll="false"/>
+		<ant dir="tapestry-examples/VlibEAR" target="install" inheritAll="false"/>
 	</target>
 	
 	<target name="documentation" depends="download-ext-doc"
