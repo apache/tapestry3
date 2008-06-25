@@ -14,49 +14,12 @@
 
 package org.apache.tapestry.engine;
 
-import java.io.Externalizable;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
-import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.ResourceBundle;
-
-import javax.servlet.RequestDispatcher;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-import javax.servlet.http.HttpSessionBindingEvent;
-import javax.servlet.http.HttpSessionBindingListener;
-
 import org.apache.bsf.BSFManager;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.tapestry.ApplicationRuntimeException;
-import org.apache.tapestry.ApplicationServlet;
-import org.apache.tapestry.IEngine;
-import org.apache.tapestry.IMarkupWriter;
-import org.apache.tapestry.INamespace;
-import org.apache.tapestry.IPage;
-import org.apache.tapestry.IRequestCycle;
-import org.apache.tapestry.IResourceResolver;
-import org.apache.tapestry.PageRedirectException;
-import org.apache.tapestry.RedirectException;
-import org.apache.tapestry.StaleLinkException;
-import org.apache.tapestry.StaleSessionException;
-import org.apache.tapestry.Tapestry;
+import org.apache.tapestry.*;
 import org.apache.tapestry.asset.ResourceChecksumSource;
 import org.apache.tapestry.asset.ResourceChecksumSourceImpl;
 import org.apache.tapestry.enhance.DefaultComponentClassEnhancer;
@@ -65,15 +28,17 @@ import org.apache.tapestry.pageload.PageSource;
 import org.apache.tapestry.request.RequestContext;
 import org.apache.tapestry.request.ResponseOutputStream;
 import org.apache.tapestry.spec.IApplicationSpecification;
-import org.apache.tapestry.util.DelegatingPropertySource;
-import org.apache.tapestry.util.PropertyHolderPropertySource;
-import org.apache.tapestry.util.ResourceBundlePropertySource;
-import org.apache.tapestry.util.ServletContextPropertySource;
-import org.apache.tapestry.util.ServletPropertySource;
-import org.apache.tapestry.util.SystemPropertiesPropertySource;
+import org.apache.tapestry.util.*;
 import org.apache.tapestry.util.exception.ExceptionAnalyzer;
 import org.apache.tapestry.util.io.DataSqueezer;
 import org.apache.tapestry.util.pool.Pool;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.*;
+import java.io.*;
+import java.util.*;
 
 /**
  *  Basis for building real Tapestry applications.  Immediate subclasses
@@ -128,7 +93,7 @@ import org.apache.tapestry.util.pool.Pool;
  **/
 
 public abstract class AbstractEngine
-    implements IEngine, IEngineServiceView, Externalizable, HttpSessionBindingListener
+        implements IEngine, IEngineServiceView, Externalizable, HttpSessionBindingListener
 {
     private static final Log LOG = LogFactory.getLog(AbstractEngine.class);
 
@@ -186,7 +151,7 @@ public abstract class AbstractEngine
      **/
 
     public static final String OUTPUT_ENCODING_PROPERTY_NAME =
-        "org.apache.tapestry.output-encoding";
+            "org.apache.tapestry.output-encoding";
 
     /**
      *  The default encoding that will be used when generating the output.
@@ -298,7 +263,7 @@ public abstract class AbstractEngine
      **/
 
     protected static final String SPECIFICATION_SOURCE_NAME =
-        "org.apache.tapestry.SpecificationSource";
+            "org.apache.tapestry.SpecificationSource";
 
     /**
      *  Servlet context attribute name for the {@link IPageSource}
@@ -325,9 +290,9 @@ public abstract class AbstractEngine
      * of {@link ResourceChecksumSource}.
      * @since 3.0.3
      */
-    protected static final String RESOURCE_CHECKSUM_SOURCE_NAME = 
-        "org.apache.tapestry.ResourceChecksumSource";
-    
+    protected static final String RESOURCE_CHECKSUM_SOURCE_NAME =
+            "org.apache.tapestry.ResourceChecksumSource";
+
     /**
      *  The source for pages, which acts as a pool, but is capable of
      *  creating pages as needed.  Stored in the
@@ -347,7 +312,7 @@ public abstract class AbstractEngine
      **/
 
     private static final boolean _resetServiceEnabled =
-        Boolean.getBoolean("org.apache.tapestry.enable-reset-service");
+            Boolean.getBoolean("org.apache.tapestry.enable-reset-service");
 
     /**
      * If true (set from the JVM system parameter
@@ -358,7 +323,7 @@ public abstract class AbstractEngine
      **/
 
     private static final boolean _disableCaching =
-        Boolean.getBoolean("org.apache.tapestry.disable-caching");
+            Boolean.getBoolean("org.apache.tapestry.disable-caching");
 
     private transient IResourceResolver _resolver;
 
@@ -450,7 +415,7 @@ public abstract class AbstractEngine
      * @since 3.0.3
      */
     private transient ResourceChecksumSource _resourceChecksumSource;
-    
+
     /**
      *  Sets the Exception page's exception property, then renders the Exception page.
      *
@@ -460,10 +425,10 @@ public abstract class AbstractEngine
      **/
 
     protected void activateExceptionPage(
-        IRequestCycle cycle,
-        ResponseOutputStream output,
-        Throwable cause)
-        throws ServletException
+            IRequestCycle cycle,
+            ResponseOutputStream output,
+            Throwable cause)
+            throws ServletException
     {
         try
         {
@@ -482,15 +447,15 @@ public abstract class AbstractEngine
             // us with no option but to write the cause to the output.
 
             reportException(
-                Tapestry.getMessage("AbstractEngine.unable-to-process-client-request"),
-                cause);
+                    Tapestry.getMessage("AbstractEngine.unable-to-process-client-request"),
+                    cause);
 
             // Also, write the exception thrown when redendering the exception
             // page, so that can get fixed as well.
 
             reportException(
-                Tapestry.getMessage("AbstractEngine.unable-to-present-exception-page"),
-                ex);
+                    Tapestry.getMessage("AbstractEngine.unable-to-present-exception-page"),
+                    ex);
 
             // And throw the exception.
 
@@ -512,7 +477,7 @@ public abstract class AbstractEngine
         System.err.println(reportTitle);
 
         System.err.println(
-            "\n\n      Session id: "
+                "\n\n      Session id: "
                 + _sessionId
                 + "\n  Client address: "
                 + _clientAddress
@@ -582,9 +547,9 @@ public abstract class AbstractEngine
         {
             if (_specification.checkExtension(Tapestry.MONITOR_FACTORY_EXTENSION_NAME))
                 _monitorFactory =
-                    (IMonitorFactory) _specification.getExtension(
-                        Tapestry.MONITOR_FACTORY_EXTENSION_NAME,
-                        IMonitorFactory.class);
+                        (IMonitorFactory) _specification.getExtension(
+                                Tapestry.MONITOR_FACTORY_EXTENSION_NAME,
+                                IMonitorFactory.class);
             else
                 _monitorFactory = DefaultMonitorFactory.SHARED;
         }
@@ -608,7 +573,7 @@ public abstract class AbstractEngine
 
         if (result == null)
             throw new ApplicationRuntimeException(
-                Tapestry.format("AbstractEngine.unknown-service", name));
+                    Tapestry.format("AbstractEngine.unknown-service", name));
 
         return result;
     }
@@ -697,11 +662,11 @@ public abstract class AbstractEngine
      **/
 
     protected void redirect(
-        String pageName,
-        IRequestCycle cycle,
-        ResponseOutputStream out,
-        ApplicationRuntimeException exception)
-        throws IOException, ServletException
+            String pageName,
+            IRequestCycle cycle,
+            ResponseOutputStream out,
+            ApplicationRuntimeException exception)
+            throws IOException, ServletException
     {
         // Discard any output from the previous page.
 
@@ -715,7 +680,7 @@ public abstract class AbstractEngine
     }
 
     public void renderResponse(IRequestCycle cycle, ResponseOutputStream output)
-        throws ServletException, IOException
+            throws ServletException, IOException
     {
         if (LOG.isDebugEnabled())
             LOG.debug("Begin render response.");
@@ -948,10 +913,10 @@ public abstract class AbstractEngine
             {
                 reportException(Tapestry.getMessage("AbstractEngine.exception-during-cleanup"), ex);
             }
-			finally
-			{
+            finally
+            {
                 cleanupAfterRequest(cycle);
-			}
+            }
 
             if (_disableCaching)
             {
@@ -962,8 +927,8 @@ public abstract class AbstractEngine
                 catch (Exception ex)
                 {
                     reportException(
-                        Tapestry.getMessage("AbstractEngine.exception-during-cache-clear"),
-                        ex);
+                            Tapestry.getMessage("AbstractEngine.exception-during-cache-clear"),
+                            ex);
                 }
             }
 
@@ -987,10 +952,10 @@ public abstract class AbstractEngine
      */
 
     protected void handlePageRedirectException(
-        PageRedirectException ex,
-        IRequestCycle cycle,
-        ResponseOutputStream output)
-        throws IOException, ServletException
+            PageRedirectException ex,
+            IRequestCycle cycle,
+            ResponseOutputStream output)
+            throws IOException, ServletException
     {
         List pageNames = new ArrayList();
 
@@ -1017,7 +982,7 @@ public abstract class AbstractEngine
                 }
 
                 throw new ApplicationRuntimeException(
-                    Tapestry.format("AbstractEngine.validate-cycle", buffer.toString()));
+                        Tapestry.format("AbstractEngine.validate-cycle", buffer.toString()));
             }
 
             // Record that this page has been a target.
@@ -1055,9 +1020,9 @@ public abstract class AbstractEngine
      **/
 
     protected IRequestCycle createRequestCycle(
-        RequestContext context,
-        IEngineService service,
-        IMonitor monitor)
+            RequestContext context,
+            IEngineService service,
+            IMonitor monitor)
     {
         return new RequestCycle(this, context, service, monitor);
     }
@@ -1088,10 +1053,10 @@ public abstract class AbstractEngine
      **/
 
     protected void handleStaleLinkException(
-        StaleLinkException ex,
-        IRequestCycle cycle,
-        ResponseOutputStream output)
-        throws IOException, ServletException
+            StaleLinkException ex,
+            IRequestCycle cycle,
+            ResponseOutputStream output)
+            throws IOException, ServletException
     {
         String staleLinkPageName = getStaleLinkPageName();
         IPage page = cycle.getPage(staleLinkPageName);
@@ -1117,10 +1082,10 @@ public abstract class AbstractEngine
      **/
 
     protected void handleStaleSessionException(
-        StaleSessionException ex,
-        IRequestCycle cycle,
-        ResponseOutputStream output)
-        throws IOException, ServletException
+            StaleSessionException ex,
+            IRequestCycle cycle,
+            ResponseOutputStream output)
+            throws IOException, ServletException
     {
         redirect(getStaleSessionPageName(), cycle, output, ex);
     }
@@ -1242,7 +1207,7 @@ public abstract class AbstractEngine
             // will inform us.
 
             String path =
-                (String) request.getAttribute(Tapestry.TAG_SUPPORT_SERVLET_PATH_ATTRIBUTE);
+                    (String) request.getAttribute(Tapestry.TAG_SUPPORT_SERVLET_PATH_ATTRIBUTE);
 
             if (path == null)
                 path = request.getServletPath();
@@ -1265,9 +1230,22 @@ public abstract class AbstractEngine
 
             if (_propertySource == null)
             {
-                _propertySource = createPropertySource(context);
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _propertySource);
+                    _propertySource = (IPropertySource) servletContext.getAttribute(name);
+
+                    if (_propertySource == null)
+                    {
+                        _propertySource = createPropertySource(context);
+
+                        servletContext.setAttribute(name, _propertySource);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1279,9 +1257,22 @@ public abstract class AbstractEngine
 
             if (_enhancer == null)
             {
-                _enhancer = createComponentClassEnhancer(context);
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _enhancer);
+                    _enhancer = (IComponentClassEnhancer) servletContext.getAttribute(name);
+
+                    if (_enhancer == null)
+                    {
+                        _enhancer = createComponentClassEnhancer(context);
+
+                        servletContext.setAttribute(name, _enhancer);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1293,9 +1284,22 @@ public abstract class AbstractEngine
 
             if (_pool == null)
             {
-                _pool = createPool(context);
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _pool);
+                    _pool = (Pool) servletContext.getAttribute(name);
+
+                    if (_pool == null)
+                    {
+                        _pool = createPool(context);
+
+                        servletContext.setAttribute(name, _pool);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1307,9 +1311,22 @@ public abstract class AbstractEngine
 
             if (_templateSource == null)
             {
-                _templateSource = createTemplateSource(context);
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _templateSource);
+                    _templateSource = (ITemplateSource) servletContext.getAttribute(name);
+
+                    if (_templateSource == null)
+                    {
+                        _templateSource = createTemplateSource(context);
+
+                        servletContext.setAttribute(name, _templateSource);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1321,9 +1338,22 @@ public abstract class AbstractEngine
 
             if (_specificationSource == null)
             {
-                _specificationSource = createSpecificationSource(context);
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _specificationSource);
+                    _specificationSource = (ISpecificationSource) servletContext.getAttribute(name);
+
+                    if (_specificationSource == null)
+                    {
+                        _specificationSource = createSpecificationSource(context);
+
+                        servletContext.setAttribute(name, _specificationSource);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1335,9 +1365,22 @@ public abstract class AbstractEngine
 
             if (_pageSource == null)
             {
-                _pageSource = createPageSource(context);
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _pageSource);
+                    _pageSource = (IPageSource) servletContext.getAttribute(name);
+
+                    if (_pageSource == null)
+                    {
+                        _pageSource = createPageSource(context);
+
+                        servletContext.setAttribute(name, _pageSource);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1349,9 +1392,22 @@ public abstract class AbstractEngine
 
             if (_scriptSource == null)
             {
-                _scriptSource = createScriptSource(context);
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _scriptSource);
+                    _scriptSource = (IScriptSource) servletContext.getAttribute(name);
+
+                    if (_scriptSource == null)
+                    {
+                        _scriptSource = createScriptSource(context);
+
+                        servletContext.setAttribute(name, _scriptSource);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1363,9 +1419,22 @@ public abstract class AbstractEngine
 
             if (_serviceMap == null)
             {
-                _serviceMap = createServiceMap();
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _serviceMap);
+                    _serviceMap = (Map) servletContext.getAttribute(name);
+
+                    if (_serviceMap == null)
+                    {
+                        _serviceMap = createServiceMap();
+
+                        servletContext.setAttribute(name, _serviceMap);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1377,9 +1446,22 @@ public abstract class AbstractEngine
 
             if (_stringsSource == null)
             {
-                _stringsSource = createComponentStringsSource(context);
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _stringsSource);
+                    _stringsSource = (IComponentMessagesSource) servletContext.getAttribute(name);
+
+                    if (_stringsSource == null)
+                    {
+                        _stringsSource = createComponentStringsSource(context);
+
+                        servletContext.setAttribute(name, _stringsSource);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1391,9 +1473,22 @@ public abstract class AbstractEngine
 
             if (_dataSqueezer == null)
             {
-                _dataSqueezer = createDataSqueezer();
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _dataSqueezer);
+                    _dataSqueezer = (DataSqueezer) servletContext.getAttribute(name);
+
+                    if (_dataSqueezer == null)
+                    {
+                        _dataSqueezer = createDataSqueezer();
+
+                        servletContext.setAttribute(name, _dataSqueezer);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1405,12 +1500,25 @@ public abstract class AbstractEngine
 
             if (_global == null)
             {
-                _global = createGlobal(context);
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _global);
+                    _global = servletContext.getAttribute(name);
+
+                    if (_global == null)
+                    {
+                        _global = createGlobal(context);
+
+                        servletContext.setAttribute(name, _global);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
-        
+
         if (_resourceChecksumSource == null)
         {
             String name = RESOURCE_CHECKSUM_SOURCE_NAME + ":" + servletName;
@@ -1419,9 +1527,22 @@ public abstract class AbstractEngine
 
             if (_resourceChecksumSource == null)
             {
-                _resourceChecksumSource = createResourceChecksumSource();
+                try
+                {
+                    context.getServlet().getLock().lock();
 
-                servletContext.setAttribute(name, _resourceChecksumSource);
+                    _resourceChecksumSource = (ResourceChecksumSource) servletContext.getAttribute(name);
+
+                    if (_resourceChecksumSource == null)
+                    {
+                        _resourceChecksumSource = createResourceChecksumSource();
+
+                        servletContext.setAttribute(name, _resourceChecksumSource);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
             }
         }
 
@@ -1541,7 +1662,7 @@ public abstract class AbstractEngine
     {
         return new ResourceChecksumSourceImpl("MD5", new Hex());
     }
-    
+
     /**
      *  Returns an object which can find resources and classes.
      *
@@ -1566,10 +1687,10 @@ public abstract class AbstractEngine
         ToStringBuilder builder = new ToStringBuilder(this);
 
         builder.append(
-            "name",
-            _specification == null
-                ? Tapestry.getMessage("AbstractEngine.unknown-specification")
-                : _specification.getName());
+                "name",
+                _specification == null
+                        ? Tapestry.getMessage("AbstractEngine.unknown-specification")
+                        : _specification.getName());
 
         builder.append("dirty", _dirty);
         builder.append("locale", _locale);
@@ -1703,8 +1824,8 @@ public abstract class AbstractEngine
         catch (Throwable t)
         {
             throw new ApplicationRuntimeException(
-                Tapestry.format("AbstractEngine.unable-to-instantiate-visit", visitClassName),
-                t);
+                    Tapestry.format("AbstractEngine.unable-to-instantiate-visit", visitClassName),
+                    t);
         }
 
         return result;
@@ -1807,7 +1928,7 @@ public abstract class AbstractEngine
 
             if (dispatcher == null)
                 throw new ApplicationRuntimeException(
-                    Tapestry.format("AbstractEngine.unable-to-find-dispatcher", _location));
+                        Tapestry.format("AbstractEngine.unable-to-find-dispatcher", _location));
 
             try
             {
@@ -1816,14 +1937,14 @@ public abstract class AbstractEngine
             catch (ServletException ex)
             {
                 throw new ApplicationRuntimeException(
-                    Tapestry.format("AbstractEngine.unable-to-forward", _location),
-                    ex);
+                        Tapestry.format("AbstractEngine.unable-to-forward", _location),
+                        ex);
             }
             catch (IOException ex)
             {
                 throw new ApplicationRuntimeException(
-                    Tapestry.format("AbstractEngine.unable-to-forward", _location),
-                    ex);
+                        Tapestry.format("AbstractEngine.unable-to-forward", _location),
+                        ex);
             }
         }
 
@@ -1840,8 +1961,8 @@ public abstract class AbstractEngine
             catch (IOException ex)
             {
                 throw new ApplicationRuntimeException(
-                    Tapestry.format("AbstractEngine.unable-to-redirect", _location),
-                    ex);
+                        Tapestry.format("AbstractEngine.unable-to-redirect", _location),
+                        ex);
             }
         }
 
@@ -1921,11 +2042,11 @@ public abstract class AbstractEngine
 
                 if (!service.getName().equals(name))
                     throw new ApplicationRuntimeException(
-                        Tapestry.format(
-                            "AbstractEngine.service-name-mismatch",
-                            name,
-                            className,
-                            serviceName));
+                            Tapestry.format(
+                                    "AbstractEngine.service-name-mismatch",
+                                    name,
+                                    className,
+                                    serviceName));
 
                 // Replace the class name with an instance
                 // of the named class.
@@ -1935,10 +2056,10 @@ public abstract class AbstractEngine
             catch (InstantiationException ex)
             {
                 String message =
-                    Tapestry.format(
-                        "AbstractEngine.unable-to-instantiate-service",
-                        name,
-                        className);
+                        Tapestry.format(
+                                "AbstractEngine.unable-to-instantiate-service",
+                                name,
+                                className);
 
                 LOG.error(message, ex);
 
@@ -1947,10 +2068,10 @@ public abstract class AbstractEngine
             catch (IllegalAccessException ex)
             {
                 String message =
-                    Tapestry.format(
-                        "AbstractEngine.unable-to-instantiate-service",
-                        name,
-                        className);
+                        Tapestry.format(
+                                "AbstractEngine.unable-to-instantiate-service",
+                                name,
+                                className);
 
                 LOG.error(message, ex);
 
@@ -2084,12 +2205,12 @@ public abstract class AbstractEngine
     }
 
     /** @since 3.0.3 */
-    
+
     public ResourceChecksumSource getResourceChecksumSource()
     {
         return _resourceChecksumSource;
     }
-    
+
     /** @since 3.0 **/
 
     protected String getExceptionPageName()
@@ -2120,7 +2241,7 @@ public abstract class AbstractEngine
      **/
 
     private static final String EXTENSION_PROPERTY_SOURCE_NAME =
-        "org.apache.tapestry.property-source";
+            "org.apache.tapestry.property-source";
 
     /**
      *  Creates a shared property source that will be stored into
@@ -2157,9 +2278,9 @@ public abstract class AbstractEngine
         if (spec.checkExtension(EXTENSION_PROPERTY_SOURCE_NAME))
         {
             IPropertySource source =
-                (IPropertySource) spec.getExtension(
-                    EXTENSION_PROPERTY_SOURCE_NAME,
-                    IPropertySource.class);
+                    (IPropertySource) spec.getExtension(
+                            EXTENSION_PROPERTY_SOURCE_NAME,
+                            IPropertySource.class);
 
             result.addSource(source);
         }
@@ -2169,7 +2290,7 @@ public abstract class AbstractEngine
         // Lastly, add a final source to handle "factory defaults".
 
         ResourceBundle bundle =
-            ResourceBundle.getBundle("org.apache.tapestry.ConfigurationDefaults");
+                ResourceBundle.getBundle("org.apache.tapestry.ConfigurationDefaults");
 
         result.addSource(new ResourceBundlePropertySource(bundle));
 
@@ -2203,8 +2324,8 @@ public abstract class AbstractEngine
         catch (Exception ex)
         {
             throw new ApplicationRuntimeException(
-                Tapestry.format("AbstractEngine.unable-to-instantiate-global", className),
-                ex);
+                    Tapestry.format("AbstractEngine.unable-to-instantiate-global", className),
+                    ex);
         }
     }
 
@@ -2241,7 +2362,7 @@ public abstract class AbstractEngine
      * Invoked from {@link #setupForRequest(RequestContext)}.  Creates
      * a new instance of {@link DefaultComponentClassEnhancer}.  Subclasses
      * may override to return a different object.
-     * 
+     *
      * <p>
      * Check the property <code>org.apache.tapestry.enhance.disable-abstract-method-validation</code>
      * and, if true, disables abstract method validation. This is used  in some
@@ -2254,9 +2375,9 @@ public abstract class AbstractEngine
     protected IComponentClassEnhancer createComponentClassEnhancer(RequestContext context)
     {
         boolean disableValidation =
-            "true".equals(
-                _propertySource.getPropertyValue(
-                    "org.apache.tapestry.enhance.disable-abstract-method-validation"));
+                "true".equals(
+                        _propertySource.getPropertyValue(
+                                "org.apache.tapestry.enhance.disable-abstract-method-validation"));
 
         return new DefaultComponentClassEnhancer(_resolver, disableValidation);
     }

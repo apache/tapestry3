@@ -14,19 +14,7 @@
 
 package org.apache.tapestry;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Locale;
-
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-
+import edu.emory.mathcs.backport.java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tapestry.engine.BaseEngine;
@@ -37,15 +25,18 @@ import org.apache.tapestry.resource.ClasspathResourceLocation;
 import org.apache.tapestry.resource.ContextResourceLocation;
 import org.apache.tapestry.spec.ApplicationSpecification;
 import org.apache.tapestry.spec.IApplicationSpecification;
-import org.apache.tapestry.util.DefaultResourceResolver;
-import org.apache.tapestry.util.DelegatingPropertySource;
-import org.apache.tapestry.util.JanitorThread;
-import org.apache.tapestry.util.ServletContextPropertySource;
-import org.apache.tapestry.util.ServletPropertySource;
-import org.apache.tapestry.util.SystemPropertiesPropertySource;
+import org.apache.tapestry.util.*;
 import org.apache.tapestry.util.exception.ExceptionAnalyzer;
 import org.apache.tapestry.util.pool.Pool;
 import org.apache.tapestry.util.xml.DocumentParseException;
+
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Locale;
 
 /**
  *  Links a servlet container with a Tapestry application.  The servlet has some
@@ -147,6 +138,12 @@ public class ApplicationServlet extends HttpServlet
     private IPropertySource _propertySource;
 
     /**
+     * Global lock used to synchronize global thread access to commonly shared
+     * services / data structures.
+     */
+    private ReentrantLock _lock = new ReentrantLock();
+
+    /**
      *  Invokes {@link #doService(HttpServletRequest, HttpServletResponse)}.
      *
      *  @since 1.0.6
@@ -182,7 +179,6 @@ public class ApplicationServlet extends HttpServlet
 
         try
         {
-
             // Create a context from the various bits and pieces.
 
             context = createRequestContext(request, response);
@@ -336,6 +332,16 @@ public class ApplicationServlet extends HttpServlet
     public IApplicationSpecification getApplicationSpecification()
     {
         return _specification;
+    }
+
+    /**
+     * Used internally to synchronize access to creation of shared services.
+     *
+     * @return The global shared lock.
+     */
+    public ReentrantLock getLock()
+    {
+        return _lock;
     }
 
     /**
@@ -724,7 +730,20 @@ public class ApplicationServlet extends HttpServlet
     protected String searchConfiguration(String propertyName)
     {
         if (_propertySource == null)
-            _propertySource = createPropertySource();
+        {
+            _lock.lock();
+
+            try
+            {
+                if (_propertySource == null)
+                {
+                    _propertySource = createPropertySource();
+                }
+            } finally
+            {
+                _lock.unlock();
+            }
+        }
 
         return _propertySource.getPropertyValue(propertyName);
     }

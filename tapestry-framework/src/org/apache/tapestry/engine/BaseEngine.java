@@ -14,22 +14,16 @@
 
 package org.apache.tapestry.engine;
 
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.tapestry.ApplicationRuntimeException;
 import org.apache.tapestry.IRequestCycle;
 import org.apache.tapestry.Tapestry;
 import org.apache.tapestry.record.SessionPageRecorder;
+
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+import java.util.*;
 
 /**
  *  Concrete implementation of {@link org.apache.tapestry.IEngine} used for ordinary
@@ -39,7 +33,7 @@ import org.apache.tapestry.record.SessionPageRecorder;
  *
  *  @author Howard Lewis Ship
  *  @version $Id$
- * 
+ *
  **/
 
 public class BaseEngine extends AbstractEngine
@@ -65,7 +59,7 @@ public class BaseEngine extends AbstractEngine
         if (Tapestry.isEmpty(_recorders))
             return;
 
-		boolean markDirty = false;
+        boolean markDirty = false;
         Iterator i = _recorders.entrySet().iterator();
 
         while (i.hasNext())
@@ -81,13 +75,13 @@ public class BaseEngine extends AbstractEngine
                 i.remove();
 
                 _activePageNames.remove(pageName);
-      	
-      			markDirty = true;
+
+                markDirty = true;
             }
         }
-        
+
         if (markDirty)
-        	markDirty();
+            markDirty();
     }
 
     public void forgetPage(String name)
@@ -101,19 +95,19 @@ public class BaseEngine extends AbstractEngine
 
         if (recorder.isDirty())
             throw new ApplicationRuntimeException(
-                Tapestry.format("BaseEngine.recorder-has-uncommited-changes", name));
+                    Tapestry.format("BaseEngine.recorder-has-uncommited-changes", name));
 
         recorder.discard();
         _recorders.remove(name);
         _activePageNames.remove(name);
-        
+
         markDirty();
     }
 
     /**
      *  Returns an unmodifiable {@link Collection} of the page names for which
      *  {@link IPageRecorder} instances exist.
-     * 
+     *
      *
      **/
 
@@ -147,19 +141,18 @@ public class BaseEngine extends AbstractEngine
     public IPageRecorder createPageRecorder(String pageName, IRequestCycle cycle)
     {
         if (_recorders == null)
-            _recorders = new HashMap(MAP_SIZE);
+            _recorders = new HashMap();
         else
         {
             if (_recorders.containsKey(pageName))
                 throw new ApplicationRuntimeException(
-                    Tapestry.format("BaseEngine.duplicate-page-recorder", pageName));
+                        Tapestry.format("BaseEngine.duplicate-page-recorder", pageName));
         }
 
         // Force the creation of the HttpSession
 
         cycle.getRequestContext().createSession();
         setStateful();
-       
 
         IPageRecorder result = new SessionPageRecorder();
         result.initialize(pageName, cycle);
@@ -170,7 +163,7 @@ public class BaseEngine extends AbstractEngine
             _activePageNames = new HashSet();
 
         _activePageNames.add(pageName);
-        
+
         markDirty();
 
         return result;
@@ -179,7 +172,7 @@ public class BaseEngine extends AbstractEngine
     /**
      *  Reconstructs the list of active page names
      *  written by {@link #writeExternal(ObjectOutput)}.
-     * 
+     *
      **/
 
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException
@@ -204,7 +197,7 @@ public class BaseEngine extends AbstractEngine
      *  Writes the engine's persistent state; this is simply the list of active page
      *  names.  For efficiency, this is written as a count followed by each name
      *  as a UTF String.
-     * 
+     *
      **/
 
     public void writeExternal(ObjectOutput out) throws IOException
@@ -233,7 +226,7 @@ public class BaseEngine extends AbstractEngine
 
     public void extendDescription(ToStringBuilder builder)
     {
-		builder.append("activePageNames", _activePageNames);
+        builder.append("activePageNames", _activePageNames);
     }
 
 }

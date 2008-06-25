@@ -80,7 +80,7 @@
                     <systemProperties>
                         <systemProperty>
                             <name>org.apache.tapestry.disable-caching</name>
-                            <value>true</value>
+                            <value>false</value>
                         </systemProperty>
                     </systemProperties>
                 </configuration>
