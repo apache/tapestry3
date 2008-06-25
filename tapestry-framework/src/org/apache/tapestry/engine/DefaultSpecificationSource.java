@@ -14,20 +14,12 @@
 
 package org.apache.tapestry.engine;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
+import edu.emory.mathcs.backport.java.util.concurrent.ConcurrentHashMap;
+import edu.emory.mathcs.backport.java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.tapestry.ApplicationRuntimeException;
-import org.apache.tapestry.IMarkupWriter;
-import org.apache.tapestry.INamespace;
-import org.apache.tapestry.IResourceLocation;
-import org.apache.tapestry.IResourceResolver;
-import org.apache.tapestry.Tapestry;
+import org.apache.tapestry.*;
 import org.apache.tapestry.parse.SpecificationParser;
 import org.apache.tapestry.resource.ClasspathResourceLocation;
 import org.apache.tapestry.spec.IApplicationSpecification;
@@ -37,6 +29,10 @@ import org.apache.tapestry.spec.LibrarySpecification;
 import org.apache.tapestry.util.IRenderDescription;
 import org.apache.tapestry.util.pool.Pool;
 import org.apache.tapestry.util.xml.DocumentParseException;
+
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 
 /**
  *  Default implementation of {@link ISpecificationSource} that
@@ -50,7 +46,7 @@ import org.apache.tapestry.util.xml.DocumentParseException;
  *
  * @author Howard Lewis Ship
  * @version $Id$
- * 
+ *
  **/
 
 public class DefaultSpecificationSource implements ISpecificationSource, IRenderDescription
@@ -60,9 +56,9 @@ public class DefaultSpecificationSource implements ISpecificationSource, IRender
     /**
      *  Key used to get and store {@link SpecificationParser} instances
      *  from the Pool.
-     * 
+     *
      *  @since 3.0
-     * 
+     *
      **/
 
     private static final String PARSER_POOL_KEY = "org.apache.tapestry.SpecificationParser";
@@ -78,50 +74,60 @@ public class DefaultSpecificationSource implements ISpecificationSource, IRender
      *
      **/
 
-    private Map _componentCache = new HashMap();
+    private Map _componentCache = new ConcurrentHashMap();
 
     /**
      *  Contains previously parsed page specifications.
-     * 
+     *
      *  @since 2.2
-     * 
+     *
      **/
 
-    private Map _pageCache = new HashMap();
+    private Map _pageCache = new ConcurrentHashMap();
 
     /**
      *  Contains previously parsed library specifications, keyed
      *  on specification resource path.
-     * 
+     *
      *  @since 2.2
-     * 
+     *
      **/
 
-    private Map _libraryCache = new HashMap();
+    private Map _libraryCache = new ConcurrentHashMap();
 
     /**
      *  Contains {@link INamespace} instances, keyed on id (which will
      *  be null for the application specification).
-     * 
+     *
      **/
 
-    private Map _namespaceCache = new HashMap();
+    private Map _namespaceCache = new ConcurrentHashMap();
+
+    /**
+     * Used to synchronize concurrent operations on specific resources.
+     */
+    private ConcurrentHashMap _lockCache = new ConcurrentHashMap();
 
     /**
      *  Reference to the shared {@link org.apache.tapestry.util.pool.Pool}.
-     * 
+     *
      *  @see org.apache.tapestry.IEngine#getPool()
-     * 
+     *
      *  @since 3.0
-     * 
+     *
      **/
 
     private Pool _pool;
 
+    /**
+     * Used to synchronize global member access.
+     */
+    private ReentrantLock _monitor = new ReentrantLock();
+
     public DefaultSpecificationSource(
-        IResourceResolver resolver,
-        IApplicationSpecification specification,
-        Pool pool)
+            IResourceResolver resolver,
+            IApplicationSpecification specification,
+            Pool pool)
     {
         _resolver = resolver;
         _specification = specification;
@@ -133,20 +139,29 @@ public class DefaultSpecificationSource implements ISpecificationSource, IRender
      *
      **/
 
-    public synchronized void reset()
+    public void reset()
     {
-        _componentCache.clear();
-        _pageCache.clear();
-        _libraryCache.clear();
-        _namespaceCache.clear();
+        _monitor.lock();
 
-        _applicationNamespace = null;
-        _frameworkNamespace = null;
+        try
+        {
+            _componentCache.clear();
+            _pageCache.clear();
+            _libraryCache.clear();
+            _namespaceCache.clear();
+            _lockCache.clear();
+
+            _applicationNamespace = null;
+            _frameworkNamespace = null;
+        } finally
+        {
+            _monitor.unlock();
+        }
     }
 
     protected IComponentSpecification parseSpecification(
-        IResourceLocation resourceLocation,
-        boolean asPage)
+            IResourceLocation resourceLocation,
+            boolean asPage)
     {
         IComponentSpecification result = null;
 
@@ -165,10 +180,10 @@ public class DefaultSpecificationSource implements ISpecificationSource, IRender
         catch (DocumentParseException ex)
         {
             throw new ApplicationRuntimeException(
-                Tapestry.format(
-                    "DefaultSpecificationSource.unable-to-parse-specification",
-                    resourceLocation),
-                ex);
+                    Tapestry.format(
+                            "DefaultSpecificationSource.unable-to-parse-specification",
+                            resourceLocation),
+                    ex);
         }
         finally
         {
@@ -190,15 +205,15 @@ public class DefaultSpecificationSource implements ISpecificationSource, IRender
         catch (DocumentParseException ex)
         {
             throw new ApplicationRuntimeException(
-                Tapestry.format(
-                    "DefaultSpecificationSource.unable-to-parse-specification",
-                    resourceLocation),
-                ex);
+                    Tapestry.format(
+                            "DefaultSpecificationSource.unable-to-parse-specification",
+                            resourceLocation),
+                    ex);
         }
 
     }
 
-    public synchronized String toString()
+    public String toString()
     {
         ToStringBuilder builder = new ToStringBuilder(this);
 
@@ -211,7 +226,7 @@ public class DefaultSpecificationSource implements ISpecificationSource, IRender
 
     /** @since 1.0.6 **/
 
-    public synchronized void renderDescription(IMarkupWriter writer)
+    public void renderDescription(IMarkupWriter writer)
     {
         writer.print("DefaultSpecificationSource[");
 
@@ -259,49 +274,94 @@ public class DefaultSpecificationSource implements ISpecificationSource, IRender
 
     /**
      *  Gets a component specification.
-     * 
+     *
      *  @param resourceLocation the complete resource path to the specification.
      *  @throws ApplicationRuntimeException if the specification cannot be obtained.
-     * 
+     *
      **/
 
-    public synchronized IComponentSpecification getComponentSpecification(IResourceLocation resourceLocation)
+    public IComponentSpecification getComponentSpecification(IResourceLocation resourceLocation)
     {
         IComponentSpecification result =
-            (IComponentSpecification) _componentCache.get(resourceLocation);
+                (IComponentSpecification) _componentCache.get(resourceLocation);
 
-        if (result == null)
+        if (result != null)
+            return result;
+
+        ReentrantLock lock = getLock(resourceLocation);
+
+        lock.lock();
+
+        try
         {
+            result = (IComponentSpecification) _componentCache.get(resourceLocation);
+
+            if (result != null)
+                return result;
+
             result = parseSpecification(resourceLocation, false);
 
             _componentCache.put(resourceLocation, result);
+        } finally
+        {
+            lock.unlock();
         }
 
         return result;
     }
 
-    public synchronized IComponentSpecification getPageSpecification(IResourceLocation resourceLocation)
+    public IComponentSpecification getPageSpecification(IResourceLocation resourceLocation)
     {
         IComponentSpecification result = (IComponentSpecification) _pageCache.get(resourceLocation);
 
-        if (result == null)
+        if (result != null)
+            return result;
+
+        ReentrantLock lock = getLock(resourceLocation);
+
+        lock.lock();
+
+        try
         {
+            result = (IComponentSpecification) _pageCache.get(resourceLocation);
+
+            if (result != null)
+                return result;
+
             result = parseSpecification(resourceLocation, true);
 
             _pageCache.put(resourceLocation, result);
+        } finally
+        {
+            lock.unlock();
         }
 
         return result;
     }
 
-    public synchronized ILibrarySpecification getLibrarySpecification(IResourceLocation resourceLocation)
+    public ILibrarySpecification getLibrarySpecification(IResourceLocation resourceLocation)
     {
         ILibrarySpecification result = (LibrarySpecification) _libraryCache.get(resourceLocation);
 
-        if (result == null)
+        if (result != null)
+            return result;
+
+        ReentrantLock lock = getLock(resourceLocation);
+
+        lock.lock();
+
+        try
         {
+            result = (LibrarySpecification) _libraryCache.get(resourceLocation);
+
+            if (result != null)
+                return result;
+
             result = parseLibrarySpecification(resourceLocation);
             _libraryCache.put(resourceLocation, result);
+        } finally
+        {
+            lock.unlock();
         }
 
         return result;
@@ -326,27 +386,52 @@ public class DefaultSpecificationSource implements ISpecificationSource, IRender
         _pool.store(PARSER_POOL_KEY, parser);
     }
 
-    public synchronized INamespace getApplicationNamespace()
+    public INamespace getApplicationNamespace()
     {
-        if (_applicationNamespace == null)
-            _applicationNamespace = new Namespace(null, null, _specification, this);
+        _monitor.lock();
 
-        return _applicationNamespace;
+        try
+        {
+            if (_applicationNamespace == null)
+                _applicationNamespace = new Namespace(null, null, _specification, this);
+
+            return _applicationNamespace;
+
+        } finally
+        {
+            _monitor.unlock();
+        }
     }
 
-    public synchronized INamespace getFrameworkNamespace()
+    public INamespace getFrameworkNamespace()
     {
-        if (_frameworkNamespace == null)
+        _monitor.lock();
+
+        try
         {
-            IResourceLocation frameworkLocation =
-                new ClasspathResourceLocation(_resolver, "/org/apache/tapestry/Framework.library");
+            if (_frameworkNamespace == null)
+            {
+                IResourceLocation frameworkLocation =
+                        new ClasspathResourceLocation(_resolver, "/org/apache/tapestry/Framework.library");
 
-            ILibrarySpecification ls = getLibrarySpecification(frameworkLocation);
+                ILibrarySpecification ls = getLibrarySpecification(frameworkLocation);
 
-            _frameworkNamespace = new Namespace(INamespace.FRAMEWORK_NAMESPACE, null, ls, this);
+                _frameworkNamespace = new Namespace(INamespace.FRAMEWORK_NAMESPACE, null, ls, this);
+            }
+
+            return _frameworkNamespace;
+
+        } finally
+        {
+            _monitor.unlock();
         }
+    }
 
-        return _frameworkNamespace;
+    private ReentrantLock getLock(Object key)
+    {
+        _lockCache.putIfAbsent(key, new ReentrantLock());
+
+        return (ReentrantLock) _lockCache.get(key);
     }
 
 }

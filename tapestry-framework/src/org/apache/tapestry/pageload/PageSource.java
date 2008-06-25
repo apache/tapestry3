@@ -15,11 +15,7 @@
 package org.apache.tapestry.pageload;
 
 import org.apache.commons.lang.builder.ToStringBuilder;
-import org.apache.tapestry.IEngine;
-import org.apache.tapestry.IPage;
-import org.apache.tapestry.IRequestCycle;
-import org.apache.tapestry.IResourceResolver;
-import org.apache.tapestry.Tapestry;
+import org.apache.tapestry.*;
 import org.apache.tapestry.engine.IMonitor;
 import org.apache.tapestry.engine.IPageSource;
 import org.apache.tapestry.resolver.PageSpecificationResolver;
@@ -138,8 +134,7 @@ public class PageSource implements IPageSource
             // Resolvers are not threadsafe, so we get one from
             // the pool or create as needed.
 
-            PageSpecificationResolver pageSpecificationResolver =
-                getPageSpecificationResolver(cycle);
+            PageSpecificationResolver pageSpecificationResolver = getPageSpecificationResolver(cycle);
 
             pageSpecificationResolver.resolve(cycle, pageName);
 

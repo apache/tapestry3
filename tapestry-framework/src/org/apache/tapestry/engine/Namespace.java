@@ -14,22 +14,13 @@
 
 package org.apache.tapestry.engine;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.tapestry.ApplicationRuntimeException;
-import org.apache.tapestry.ILocation;
-import org.apache.tapestry.INamespace;
-import org.apache.tapestry.IResourceLocation;
-import org.apache.tapestry.Tapestry;
+import edu.emory.mathcs.backport.java.util.concurrent.ConcurrentHashMap;
+import org.apache.tapestry.*;
 import org.apache.tapestry.resource.ClasspathResourceLocation;
 import org.apache.tapestry.spec.IComponentSpecification;
 import org.apache.tapestry.spec.ILibrarySpecification;
+
+import java.util.*;
 
 /**
  *  Implementation of {@link org.apache.tapestry.INamespace}
@@ -60,7 +51,7 @@ public class Namespace implements INamespace
      * 
      **/
 
-    private Map _pages = Collections.synchronizedMap(new HashMap());
+    private Map _pages = new ConcurrentHashMap();
 
     /**
      *  Map of {@link org.apache.tapestry.spec.ComponentSpecification} keyed on
@@ -68,14 +59,14 @@ public class Namespace implements INamespace
      * 
      **/
 
-    private Map _components = Collections.synchronizedMap(new HashMap());
+    private Map _components = new ConcurrentHashMap();
 
     /**
      *  Map, keyed on id, of {@link INamespace}.
      * 
      **/
 
-    private Map _children = Collections.synchronizedMap(new HashMap());
+    private Map _children = new ConcurrentHashMap();
 
     public Namespace(
         String id,

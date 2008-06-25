@@ -14,24 +14,11 @@
 
 package org.apache.tapestry;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
 import ognl.OgnlRuntime;
-
 import org.apache.tapestry.bean.BeanProvider;
 import org.apache.tapestry.bean.BeanProviderPropertyAccessor;
 import org.apache.tapestry.engine.IPageLoader;
-import org.apache.tapestry.event.ChangeObserver;
-import org.apache.tapestry.event.PageDetachListener;
-import org.apache.tapestry.event.PageEvent;
-import org.apache.tapestry.event.PageRenderListener;
-import org.apache.tapestry.event.PageValidateListener;
+import org.apache.tapestry.event.*;
 import org.apache.tapestry.listener.ListenerMap;
 import org.apache.tapestry.param.ParameterManager;
 import org.apache.tapestry.spec.BaseLocatable;
@@ -39,6 +26,8 @@ import org.apache.tapestry.spec.IComponentSpecification;
 import org.apache.tapestry.util.prop.OgnlUtils;
 import org.apache.tapestry.util.prop.PropertyFinder;
 import org.apache.tapestry.util.prop.PropertyInfo;
+
+import java.util.*;
 
 /**
  *  Abstract base class implementing the {@link IComponent} interface.
@@ -689,8 +678,7 @@ public abstract class AbstractComponent extends BaseLocatable implements ICompon
         if (_components == null)
             return EMPTY_MAP;
 
-        return Collections.unmodifiableMap(_components);
-
+        return _components;
     }
 
     public Map getAssets()
@@ -698,7 +686,7 @@ public abstract class AbstractComponent extends BaseLocatable implements ICompon
         if (_assets == null)
             return EMPTY_MAP;
 
-        return Collections.unmodifiableMap(_assets);
+        return _assets;
     }
 
     public IAsset getAsset(String name)

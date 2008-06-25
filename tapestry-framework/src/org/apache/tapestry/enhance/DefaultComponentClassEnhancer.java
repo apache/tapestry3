@@ -14,14 +14,7 @@
 
 package org.apache.tapestry.enhance;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
+import edu.emory.mathcs.backport.java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tapestry.ApplicationRuntimeException;
@@ -30,6 +23,12 @@ import org.apache.tapestry.Tapestry;
 import org.apache.tapestry.engine.IComponentClassEnhancer;
 import org.apache.tapestry.enhance.javassist.EnhancedClassFactory;
 import org.apache.tapestry.spec.IComponentSpecification;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  *  Default implementation of {@link IComponentClassEnhancer}.
@@ -61,7 +60,7 @@ public class DefaultComponentClassEnhancer implements IComponentClassEnhancer
      */
     public DefaultComponentClassEnhancer(IResourceResolver resolver, boolean disableValidation)
     {
-        _cachedClasses = Collections.synchronizedMap(new HashMap());
+        _cachedClasses = new ConcurrentHashMap();
         _resolver = resolver;
         _factory = createEnhancedClassFactory();
         _disableValidation = disableValidation;

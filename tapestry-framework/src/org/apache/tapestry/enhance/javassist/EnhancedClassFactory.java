@@ -18,7 +18,6 @@ import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.LoaderClassPath;
 import javassist.NotFoundException;
-
 import org.apache.tapestry.IResourceResolver;
 import org.apache.tapestry.enhance.CodeGenerationException;
 import org.apache.tapestry.enhance.EnhancedClassLoader;
@@ -29,7 +28,7 @@ import org.apache.tapestry.enhance.IEnhancedClassFactory;
  *  This class defines the factory for creation of new Javassist enhanced classes. 
  *  There is typically only one object of this class in the system. 
  *  Common functionality objects for Javassist enhancement are stored here.
- * 
+ *
  *  @author Mindbridge
  *  @version $Id$
  *  @since 3.0
@@ -48,18 +47,18 @@ public class EnhancedClassFactory implements IEnhancedClassFactory
 
         reset();
     }
-    
+
     protected ClassPool createClassPool()
     {
         ClassLoader loader = _resourceResolver.getClassLoader();
-        
+
         // create a new ClassPool and make sure it uses the application resource resolver 
         ClassPool classPool = new ClassPool(null);
         classPool.insertClassPath(new LoaderClassPath(loader));
-        
+
         return classPool;
     }
-    
+
     /**
      * @see org.apache.tapestry.enhance.IEnhancedClassFactory#reset()
      */
@@ -72,7 +71,7 @@ public class EnhancedClassFactory implements IEnhancedClassFactory
         ClassLoader loader = _resourceResolver.getClassLoader();
         _enhancedClassLoader = new EnhancedClassLoader(loader);
     }
-   
+
 
     /**
      * @see org.apache.tapestry.enhance.IEnhancedClassFactory#createEnhancedClass(java.lang.String, java.lang.Class)
@@ -96,29 +95,29 @@ public class EnhancedClassFactory implements IEnhancedClassFactory
      *  Given the java class, returns the equivalent {@link CtClass type}.  In addition,
      *  knows about scalar types, arrays of scalar types, java.lang.Object[] and
      *  java.lang.String[].
-     * 
+     *
      **/
 
     public CtClass getObjectType(String type)
     {
 
-            synchronized (this) {
-                CtClass result = getClassMapping().getType(type);
+        synchronized (this) {
+            CtClass result = getClassMapping().getType(type);
 
-                if (result == null)
+            if (result == null)
+            {
+                try
                 {
-                    try
-                    {
-                        result = _classPool.get(type);
-                        getClassMapping().recordType(type, result);
-                    }
-                    catch (NotFoundException e)
-                    {
-                        throw new CodeGenerationException(e);
-                    }
+                    result = _classPool.get(type);
+                    getClassMapping().recordType(type, result);
                 }
-                return result;
+                catch (NotFoundException e)
+                {
+                    throw new CodeGenerationException(e);
+                }
             }
+            return result;
+        }
 
     }
 

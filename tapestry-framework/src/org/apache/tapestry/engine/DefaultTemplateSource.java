@@ -14,43 +14,25 @@
 
 package org.apache.tapestry.engine;
 
+import edu.emory.mathcs.backport.java.util.concurrent.ConcurrentHashMap;
+import edu.emory.mathcs.backport.java.util.concurrent.locks.ReentrantLock;
+import org.apache.commons.lang.builder.ToStringBuilder;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.tapestry.*;
+import org.apache.tapestry.parse.*;
+import org.apache.tapestry.spec.IApplicationSpecification;
+import org.apache.tapestry.spec.IComponentSpecification;
+import org.apache.tapestry.util.*;
+
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
-
-import org.apache.commons.lang.builder.ToStringBuilder;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.tapestry.ApplicationRuntimeException;
-import org.apache.tapestry.IAsset;
-import org.apache.tapestry.IComponent;
-import org.apache.tapestry.IEngine;
-import org.apache.tapestry.ILocation;
-import org.apache.tapestry.IMarkupWriter;
-import org.apache.tapestry.INamespace;
-import org.apache.tapestry.IRequestCycle;
-import org.apache.tapestry.IResourceLocation;
-import org.apache.tapestry.Tapestry;
-import org.apache.tapestry.parse.ComponentTemplate;
-import org.apache.tapestry.parse.ITemplateParserDelegate;
-import org.apache.tapestry.parse.TemplateParseException;
-import org.apache.tapestry.parse.TemplateParser;
-import org.apache.tapestry.parse.TemplateToken;
-import org.apache.tapestry.resolver.ComponentSpecificationResolver;
-import org.apache.tapestry.spec.IApplicationSpecification;
-import org.apache.tapestry.spec.IComponentSpecification;
-import org.apache.tapestry.util.DelegatingPropertySource;
-import org.apache.tapestry.util.IRenderDescription;
-import org.apache.tapestry.util.LocalizedPropertySource;
-import org.apache.tapestry.util.MultiKey;
-import org.apache.tapestry.util.PropertyHolderPropertySource;
 
 /**
  *  Default implementation of {@link ITemplateSource}.  Templates, once parsed,
@@ -61,7 +43,7 @@ import org.apache.tapestry.util.PropertyHolderPropertySource;
  *
  *  @author Howard Lewis Ship
  *  @version $Id$
- * 
+ *
  **/
 
 public class DefaultTemplateSource implements ITemplateSource, IRenderDescription
@@ -71,19 +53,22 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
 
     // The name of the component/application/etc property that will be used to
     // determine the encoding to use when loading the template
-         
-    private static final String TEMPLATE_ENCODING_PROPERTY_NAME = "org.apache.tapestry.template-encoding"; 
+
+    private static final String TEMPLATE_ENCODING_PROPERTY_NAME = "org.apache.tapestry.template-encoding";
 
     // Cache of previously retrieved templates.  Key is a multi-key of 
     // specification resource path and locale (local may be null), value
     // is the ComponentTemplate.
 
-    private Map _cache = Collections.synchronizedMap(new HashMap());
+    private Map _cache = new ConcurrentHashMap();//Collections.synchronizedMap(new HashMap());
 
     // Previously read templates; key is the IResourceLocation, value
     // is the ComponentTemplate.
 
-    private Map _templates = Collections.synchronizedMap(new HashMap());
+    private Map _templates = new ConcurrentHashMap(); //Collections.synchronizedMap(new HashMap());
+
+    // Used to synchronize access to specific templates
+    private ConcurrentHashMap _lockCache = new ConcurrentHashMap();
 
     /**
      *  Number of tokens (each template contains multiple tokens).
@@ -113,6 +98,7 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     {
         _cache.clear();
         _templates.clear();
+        _lockCache.clear();
 
         _tokenCount = 0;
     }
@@ -121,7 +107,7 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
      *  Reads the template for the component.
      *
      *  <p>Returns null if the template can't be found.
-     * 
+     *
      **/
 
     public ComponentTemplate getTemplate(IRequestCycle cycle, IComponent component)
@@ -137,29 +123,43 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
         if (result != null)
             return result;
 
-        result = findTemplate(cycle, specificationLocation, component, locale);
+        _lockCache.putIfAbsent(key, new ReentrantLock());
 
-        if (result == null)
+        ReentrantLock lock = (ReentrantLock)_lockCache.get(key);
+
+        lock.lock();
+        try
         {
-            result = getTemplateFromDelegate(cycle, component, locale);
-
+            result = searchCache(key);
             if (result != null)
                 return result;
 
-            String stringKey =
-                component.getSpecification().isPageSpecification()
-                    ? "DefaultTemplateSource.no-template-for-page"
-                    : "DefaultTemplateSource.no-template-for-component";
+            result = findTemplate(cycle, specificationLocation, component, locale);
 
-            throw new ApplicationRuntimeException(
-                Tapestry.format(stringKey, component.getExtendedId(), locale),
-                component,
-                component.getLocation(),
-                null);
+            if (result == null)
+            {
+                result = getTemplateFromDelegate(cycle, component, locale);
+
+                if (result != null)
+                    return result;
+
+                String stringKey =
+                        component.getSpecification().isPageSpecification()
+                                ? "DefaultTemplateSource.no-template-for-page"
+                                : "DefaultTemplateSource.no-template-for-component";
+
+                throw new ApplicationRuntimeException(
+                        Tapestry.format(stringKey, component.getExtendedId(), locale),
+                        component,
+                        component.getLocation(),
+                        null);
+            }
+
+            saveToCache(key, result);
+        } finally
+        {
+            lock.unlock();
         }
-
-        saveToCache(key, result);
-
         return result;
     }
 
@@ -175,9 +175,9 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     private ComponentTemplate getTemplateFromDelegate(
-        IRequestCycle cycle,
-        IComponent component,
-        Locale locale)
+            IRequestCycle cycle,
+            IComponent component,
+            Locale locale)
     {
         if (_delegate == null)
         {
@@ -186,9 +186,9 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
 
             if (spec.checkExtension(Tapestry.TEMPLATE_SOURCE_DELEGATE_EXTENSION_NAME))
                 _delegate =
-                    (ITemplateSourceDelegate) spec.getExtension(
-                        Tapestry.TEMPLATE_SOURCE_DELEGATE_EXTENSION_NAME,
-                        ITemplateSourceDelegate.class);
+                        (ITemplateSourceDelegate) spec.getExtension(
+                                Tapestry.TEMPLATE_SOURCE_DELEGATE_EXTENSION_NAME,
+                                ITemplateSourceDelegate.class);
             else
                 _delegate = NullTemplateSourceDelegate.getSharedInstance();
 
@@ -205,16 +205,16 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
      *  <li>If a page in the application namespace, search in the application root
      *  <li>Fail!
      *  </ul>
-     * 
+     *
      *  @return the template, or null if not found
-     * 
+     *
      **/
 
     private ComponentTemplate findTemplate(
-        IRequestCycle cycle,
-        IResourceLocation location,
-        IComponent component,
-        Locale locale)
+            IRequestCycle cycle,
+            IResourceLocation location,
+            IComponent component,
+            Locale locale)
     {
         IAsset templateAsset = component.getAsset(TEMPLATE_ASSET_NAME);
 
@@ -226,7 +226,7 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
         String templateBaseName = name.substring(0, dotx + 1) + getTemplateExtension(component);
 
         ComponentTemplate result =
-            findStandardTemplate(cycle, location, component, templateBaseName, locale);
+                findStandardTemplate(cycle, location, component, templateBaseName, locale);
 
         if (result == null
             && component.getSpecification().isPageSpecification()
@@ -237,10 +237,10 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     private ComponentTemplate findPageTemplateInApplicationRoot(
-        IRequestCycle cycle,
-        IComponent component,
-        String templateBaseName,
-        Locale locale)
+            IRequestCycle cycle,
+            IComponent component,
+            String templateBaseName,
+            Locale locale)
     {
         if (LOG.isDebugEnabled())
             LOG.debug("Checking for " + templateBaseName + " in application root");
@@ -249,7 +249,7 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
             _applicationRootLocation = Tapestry.getApplicationRootLocation(cycle);
 
         IResourceLocation baseLocation =
-            _applicationRootLocation.getRelativeLocation(templateBaseName);
+                _applicationRootLocation.getRelativeLocation(templateBaseName);
         IResourceLocation localizedLocation = baseLocation.getLocalization(locale);
 
         if (localizedLocation == null)
@@ -260,13 +260,13 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
 
     /**
      *  Reads an asset to get the template.
-     * 
+     *
      **/
 
     private ComponentTemplate readTemplateFromAsset(
-        IRequestCycle cycle,
-        IComponent component,
-        IAsset asset)
+            IRequestCycle cycle,
+            IComponent component,
+            IAsset asset)
     {
         InputStream stream = asset.getResourceAsStream(cycle);
 
@@ -275,7 +275,7 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
         try
         {
             String encoding = getTemplateEncoding(cycle, component, null);
-            
+
             templateData = readTemplateStream(stream, encoding);
 
             stream.close();
@@ -283,8 +283,8 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
         catch (IOException ex)
         {
             throw new ApplicationRuntimeException(
-                Tapestry.format("DefaultTemplateSource.unable-to-read-template", asset),
-                ex);
+                    Tapestry.format("DefaultTemplateSource.unable-to-read-template", asset),
+                    ex);
         }
 
         IResourceLocation resourceLocation = asset.getResourceLocation();
@@ -298,19 +298,19 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
      *  parsing the template.
      *
      *  @return the template, or null if not found.
-     * 
+     *
      **/
 
     private ComponentTemplate findStandardTemplate(
-        IRequestCycle cycle,
-        IResourceLocation location,
-        IComponent component,
-        String templateBaseName,
-        Locale locale)
+            IRequestCycle cycle,
+            IResourceLocation location,
+            IComponent component,
+            String templateBaseName,
+            Locale locale)
     {
         if (LOG.isDebugEnabled())
             LOG.debug(
-                "Searching for localized version of template for "
+                    "Searching for localized version of template for "
                     + location
                     + " in locale "
                     + locale.getDisplayName());
@@ -330,13 +330,13 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
      *  Returns a previously parsed template at the specified location (which must already
      *  be localized).  If not already in the template Map, then the
      *  location is parsed and stored into the templates Map, then returned.
-     * 
+     *
      **/
 
     private ComponentTemplate getOrParseTemplate(
-        IRequestCycle cycle,
-        IResourceLocation location,
-        IComponent component)
+            IRequestCycle cycle,
+            IResourceLocation location,
+            IComponent component)
     {
 
         ComponentTemplate result = (ComponentTemplate) _templates.get(location);
@@ -362,12 +362,12 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
      **/
 
     private ComponentTemplate parseTemplate(
-        IRequestCycle cycle,
-        IResourceLocation location,
-        IComponent component)
+            IRequestCycle cycle,
+            IResourceLocation location,
+            IComponent component)
     {
         String encoding = getTemplateEncoding(cycle, component, location.getLocale());
-        
+
         char[] templateData = readTemplate(location, encoding);
         if (templateData == null)
             return null;
@@ -375,19 +375,19 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
         return constructTemplateInstance(cycle, templateData, location, component);
     }
 
-    /** 
+    /**
      *  This method is currently synchronized, because
      *  {@link TemplateParser} is not threadsafe.  Another good candidate
      *  for a pooling mechanism, especially because parsing a template
      *  may take a while.
-     * 
+     *
      **/
 
     private synchronized ComponentTemplate constructTemplateInstance(
-        IRequestCycle cycle,
-        char[] templateData,
-        IResourceLocation location,
-        IComponent component)
+            IRequestCycle cycle,
+            char[] templateData,
+            IResourceLocation location,
+            IComponent component)
     {
         if (_parser == null)
             _parser = new TemplateParser();
@@ -403,8 +403,8 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
         catch (TemplateParseException ex)
         {
             throw new ApplicationRuntimeException(
-                Tapestry.format("DefaultTemplateSource.unable-to-parse-template", location),
-                ex);
+                    Tapestry.format("DefaultTemplateSource.unable-to-parse-template", location),
+                    ex);
         }
 
         if (LOG.isDebugEnabled())
@@ -450,8 +450,8 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
         catch (IOException ex)
         {
             throw new ApplicationRuntimeException(
-                Tapestry.format("DefaultTemplateSource.unable-to-read-template", location),
-                ex);
+                    Tapestry.format("DefaultTemplateSource.unable-to-read-template", location),
+                    ex);
         }
         finally
         {
@@ -523,20 +523,20 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
      *  Checks for the {@link Tapestry#TEMPLATE_EXTENSION_PROPERTY} in the component's
      *  specification, then in the component's namespace's specification.  Returns
      *  {@link Tapestry#DEFAULT_TEMPLATE_EXTENSION} if not otherwise overriden.
-     * 
+     *
      **/
 
     private String getTemplateExtension(IComponent component)
     {
         String extension =
-            component.getSpecification().getProperty(Tapestry.TEMPLATE_EXTENSION_PROPERTY);
+                component.getSpecification().getProperty(Tapestry.TEMPLATE_EXTENSION_PROPERTY);
 
         if (extension != null)
             return extension;
 
         extension =
-            component.getNamespace().getSpecification().getProperty(
-                Tapestry.TEMPLATE_EXTENSION_PROPERTY);
+                component.getNamespace().getSpecification().getProperty(
+                        Tapestry.TEMPLATE_EXTENSION_PROPERTY);
 
         if (extension != null)
             return extension;
@@ -592,7 +592,7 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
         writer.print("]");
 
     }
-    
+
     private String getTemplateEncoding(IRequestCycle cycle, IComponent component, Locale locale)
     {
         IPropertySource source = getComponentPropertySource(cycle, component);
@@ -602,7 +602,7 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
 
         return getTemplateEncodingProperty(source);
     }
-    
+
     private IPropertySource getComponentPropertySource(IRequestCycle cycle, IComponent component)
     {
         DelegatingPropertySource source = new DelegatingPropertySource();
@@ -616,13 +616,13 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
 
         // Then search the rest of the standard path
         source.addSource(cycle.getEngine().getPropertySource());
-        
+
         return source;
     }
-    
+
     private String getTemplateEncodingProperty(IPropertySource source)
     {
         return source.getPropertyValue(TEMPLATE_ENCODING_PROPERTY_NAME);
     }
-    
+
 }
