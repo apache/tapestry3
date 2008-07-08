@@ -16,16 +16,19 @@ package org.apache.tapestry.enhance.javassist;
 
 import javassist.ClassPool;
 import javassist.CtClass;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tapestry.enhance.BaseEnhancedClass;
 import org.apache.tapestry.enhance.EnhancedClassLoader;
 import org.apache.tapestry.enhance.IEnhancer;
+import org.apache.tapestry.enhance.MethodSignature;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  *  Represents a class to be enhanced using Javassist. 
- * 
+ *
  *  @author Mindbridge
  *  @version $Id$
  *  @since 3.0
@@ -39,6 +42,8 @@ public class EnhancedClass extends BaseEnhancedClass
     private EnhancedClassFactory _classFactory;
 
     private ClassFabricator _classFabricator = null;
+
+    private Set _methods = new HashSet();
 
     public EnhancedClass(String className, Class parentClass, EnhancedClassFactory classFactory)
     {
@@ -83,17 +88,17 @@ public class EnhancedClass extends BaseEnhancedClass
      * @see org.apache.tapestry.enhance.IEnhancedClass#createProperty(java.lang.String, java.lang.String, java.lang.String, boolean)
      */
     public void createProperty(
-        String propertyName,
-        String propertyType,
-        String readMethodName,
-        boolean persistent)
+            String propertyName,
+            String propertyType,
+            String readMethodName,
+            boolean persistent)
     {
         IEnhancer enhancer =
-            new CreatePropertyEnhancer(
-                propertyName,
-                getObjectType(propertyType),
-                readMethodName,
-                persistent);
+                new CreatePropertyEnhancer(
+                        propertyName,
+                        getObjectType(propertyType),
+                        readMethodName,
+                        persistent);
         addEnhancer(enhancer);
     }
 
@@ -101,18 +106,18 @@ public class EnhancedClass extends BaseEnhancedClass
      * @see org.apache.tapestry.enhance.IEnhancedClass#createAutoParameter(java.lang.String, java.lang.String, java.lang.String, java.lang.String)
      */
     public void createAutoParameter(
-        String propertyName,
-        String parameterName,
-        String typeClassName,
-        String readMethodName)
+            String propertyName,
+            String parameterName,
+            String typeClassName,
+            String readMethodName)
     {
         IEnhancer enhancer =
-            new CreateAutoParameterEnhancer(
-                this,
-                propertyName,
-                parameterName,
-                getObjectType(typeClassName),
-                readMethodName);
+                new CreateAutoParameterEnhancer(
+                        this,
+                        propertyName,
+                        parameterName,
+                        getObjectType(typeClassName),
+                        readMethodName);
         addEnhancer(enhancer);
     }
 
@@ -131,9 +136,34 @@ public class EnhancedClass extends BaseEnhancedClass
 
         EnhancedClassLoader loader = _classFactory.getEnhancedClassLoader();
         return loader.defineClass(
-            enhancedClassName,
-            enhancedClassBytes,
-            _parentClass.getProtectionDomain());
+                enhancedClassName,
+                enhancedClassBytes,
+                _parentClass.getProtectionDomain());
     }
 
+    public void addInterface(Class type)
+    {
+        getClassFabricator().addInterface(type);
+    }
+
+    public void addMethod(int modifiers, MethodSignature signature, String body)
+    {
+        getClassFabricator().addMethod(modifiers, signature, body);
+        _methods.add(signature);
+    }
+
+    public void addField(String name, Class type)
+    {
+        getClassFabricator().createField(getClassFabricator().getCtClass(type), name);
+    }
+
+    public void addConstructor(Class[] parameterTypes, Class[] exceptions, String body)
+    {
+        getClassFabricator().addConstructor(parameterTypes, exceptions, body);
+    }
+
+    public boolean containsMethod(MethodSignature signature)
+    {
+        return _methods.contains(signature);
+    }
 }

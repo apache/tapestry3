@@ -17,13 +17,13 @@ package org.apache.tapestry;
 import ognl.OgnlRuntime;
 import org.apache.tapestry.bean.BeanProvider;
 import org.apache.tapestry.bean.BeanProviderPropertyAccessor;
+import org.apache.tapestry.engine.ExpressionEvaluator;
 import org.apache.tapestry.engine.IPageLoader;
 import org.apache.tapestry.event.*;
 import org.apache.tapestry.listener.ListenerMap;
 import org.apache.tapestry.param.ParameterManager;
 import org.apache.tapestry.spec.BaseLocatable;
 import org.apache.tapestry.spec.IComponentSpecification;
-import org.apache.tapestry.util.prop.OgnlUtils;
 import org.apache.tapestry.util.prop.PropertyFinder;
 import org.apache.tapestry.util.prop.PropertyInfo;
 
@@ -188,6 +188,8 @@ public abstract class AbstractComponent extends BaseLocatable implements ICompon
      **/
 
     private IMessages _strings;
+
+    private ExpressionEvaluator _evaluator;
 
     public void addAsset(String name, IAsset asset)
     {
@@ -470,9 +472,10 @@ public abstract class AbstractComponent extends BaseLocatable implements ICompon
 
 		if (info != null && info.isReadWrite() && info.getType().equals(IBinding.class))
 		{
-			IResourceResolver resolver = getPage().getEngine().getResourceResolver();
+            return (IBinding) getEvaluator().read(this, bindingPropertyName);
+            //IResourceResolver resolver = getPage().getEngine().getResourceResolver();
 
-			return (IBinding) OgnlUtils.get(bindingPropertyName, resolver, this);
+			//return (IBinding) OgnlUtils.get(bindingPropertyName, resolver, this);
 		}
 
 		if (_bindings == null)
@@ -639,8 +642,9 @@ public abstract class AbstractComponent extends BaseLocatable implements ICompon
 
 		if (info != null && info.isReadWrite() && info.getType().equals(IBinding.class))
 		{
-			IResourceResolver resolver = getPage().getEngine().getResourceResolver();
-			OgnlUtils.set(bindingPropertyName, resolver, this, binding);
+            getEvaluator().write(this, bindingPropertyName, binding);
+            // IResourceResolver resolver = getPage().getEngine().getResourceResolver();
+			// OgnlUtils.set(bindingPropertyName, resolver, this, binding);
 			return;
 		}
 
@@ -1111,6 +1115,16 @@ public abstract class AbstractComponent extends BaseLocatable implements ICompon
     {
     }
 
+    ExpressionEvaluator getEvaluator()
+    {
+        if (_evaluator == null)
+        {
+            _evaluator = _page.getEngine().getExpressionEvaluator();
+        }
+
+        return _evaluator;
+    }
+
     /**
      *  Sets a property of a component.
      *  @see IComponent 
@@ -1118,8 +1132,10 @@ public abstract class AbstractComponent extends BaseLocatable implements ICompon
      */
     public void setProperty(String propertyName, Object value)
     {
-        IResourceResolver resolver = getResourceResolver();
-        OgnlUtils.set(propertyName, resolver, this, value);
+        getEvaluator().write(this, propertyName, value);
+
+        // IResourceResolver resolver = getResourceResolver();
+        // OgnlUtils.set(propertyName, resolver, this, value);
     }
     /**
      *  Gets a property of a component.
@@ -1128,7 +1144,9 @@ public abstract class AbstractComponent extends BaseLocatable implements ICompon
      */
     public Object getProperty(String propertyName)
     {
-        IResourceResolver resolver = getResourceResolver();
-        return OgnlUtils.get(propertyName, resolver, this);
+        return getEvaluator().read(this, propertyName);
+        
+        //IResourceResolver resolver = getResourceResolver();
+        //return OgnlUtils.get(propertyName, resolver, this);
     }
 }

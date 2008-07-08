@@ -79,7 +79,7 @@ public abstract class Border extends BaseComponent implements PageRenderListener
 	
 	public boolean isActivePage()
 	{
-		return getPageName().equals(getActivePageName());
+        return getPageName().equals(getActivePageName());
 	}
 
     public String getPageTitle()

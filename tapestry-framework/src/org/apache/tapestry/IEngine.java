@@ -14,25 +14,16 @@
 
 package org.apache.tapestry;
 
-import java.io.IOException;
-import java.util.Locale;
-
-import javax.servlet.ServletException;
-
 import org.apache.tapestry.asset.ResourceChecksumSource;
-import org.apache.tapestry.engine.IComponentClassEnhancer;
-import org.apache.tapestry.engine.IComponentMessagesSource;
-import org.apache.tapestry.engine.IEngineService;
-import org.apache.tapestry.engine.IPageRecorder;
-import org.apache.tapestry.engine.IPageSource;
-import org.apache.tapestry.engine.IPropertySource;
-import org.apache.tapestry.engine.IScriptSource;
-import org.apache.tapestry.engine.ISpecificationSource;
-import org.apache.tapestry.engine.ITemplateSource;
+import org.apache.tapestry.engine.*;
 import org.apache.tapestry.request.RequestContext;
 import org.apache.tapestry.spec.IApplicationSpecification;
 import org.apache.tapestry.util.io.DataSqueezer;
 import org.apache.tapestry.util.pool.Pool;
+
+import javax.servlet.ServletException;
+import java.io.IOException;
+import java.util.Locale;
 
 /**
  * Defines the core, session-persistant object used to run a Tapestry
@@ -228,6 +219,13 @@ public interface IEngine
      **/
 
     public IResourceResolver getResourceResolver();
+
+    /**
+     * Gets the OGNL expression evaluator.
+     *
+     * @return The expression evaluator.
+     */
+    public ExpressionEvaluator getExpressionEvaluator();
 
     /**
      *  Returns the visit object, an object that represents the client's visit

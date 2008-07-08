@@ -21,7 +21,6 @@ import org.apache.tapestry.ApplicationRuntimeException;
 import org.apache.tapestry.IResourceResolver;
 import org.apache.tapestry.Tapestry;
 import org.apache.tapestry.engine.IComponentClassEnhancer;
-import org.apache.tapestry.enhance.javassist.EnhancedClassFactory;
 import org.apache.tapestry.spec.IComponentSpecification;
 
 import java.lang.reflect.Method;
@@ -58,17 +57,12 @@ public class DefaultComponentClassEnhancer implements IComponentClassEnhancer
      * @param disableValidation if true, then validation (of unimplemented abstract methods)
      * is skipped
      */
-    public DefaultComponentClassEnhancer(IResourceResolver resolver, boolean disableValidation)
+    public DefaultComponentClassEnhancer(IResourceResolver resolver, boolean disableValidation, IEnhancedClassFactory classFactory)
     {
         _cachedClasses = new ConcurrentHashMap();
         _resolver = resolver;
-        _factory = createEnhancedClassFactory();
+        _factory = classFactory;
         _disableValidation = disableValidation;
-    }
-
-    protected IEnhancedClassFactory createEnhancedClassFactory()
-    {
-        return new EnhancedClassFactory(getResourceResolver());
     }
 
     public synchronized void reset()
@@ -244,7 +238,7 @@ public class DefaultComponentClassEnhancer implements IComponentClassEnhancer
 
             boolean isAbstract = Modifier.isAbstract(m.getModifiers());
 
-            MethodSignature s = new MethodSignature(m);
+            MethodSignature s = new MethodSignatureImpl(m);
 
             if (isAbstract)
             {

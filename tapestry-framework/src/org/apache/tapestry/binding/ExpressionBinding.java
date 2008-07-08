@@ -14,22 +14,19 @@
 
 package org.apache.tapestry.binding;
 
-import java.util.Map;
-
+import ognl.Node;
 import ognl.Ognl;
 import ognl.OgnlException;
 import ognl.TypeConverter;
-
-import org.apache.tapestry.BindingException;
-import org.apache.tapestry.IComponent;
-import org.apache.tapestry.ILocation;
-import org.apache.tapestry.IResourceResolver;
-import org.apache.tapestry.Tapestry;
+import ognl.enhance.ExpressionAccessor;
+import org.apache.tapestry.*;
+import org.apache.tapestry.engine.ExpressionEvaluator;
 import org.apache.tapestry.spec.BeanLifecycle;
-import org.apache.tapestry.spec.IBeanSpecification;
 import org.apache.tapestry.spec.IApplicationSpecification;
+import org.apache.tapestry.spec.IBeanSpecification;
 import org.apache.tapestry.util.StringSplitter;
-import org.apache.tapestry.util.prop.OgnlUtils;
+
+import java.util.Map;
 
 /**
  *  Implements a dynamic binding, based on getting and fetching
@@ -37,7 +34,7 @@ import org.apache.tapestry.util.prop.OgnlUtils;
  *  upon the <a href="http://www.ognl.org">OGNL</a> library.
  *
  *  <p><b>Optimization of the Expression</b>
- * 
+ *
  *  <p>There's a lot of room for optimization here because we can
  *  count on some portions of the expression to be
  *  effectively static.  Note that we type the root object as
@@ -56,13 +53,13 @@ import org.apache.tapestry.util.prop.OgnlUtils;
  *  <p>This means that once an ExpressionBinding has been triggered, 
  *  the {@link #toString()} method may return different values for the root
  *  component and the expression than was originally set.
- * 
+ *
  *  <p><b>Identifying Invariants</b>
- * 
+ *
  *  <p>Most expressions are fully dynamic; they must be
  *  resolved each time they are accessed.  This can be somewhat inefficient.
  *  Tapestry can identify certain paths as invariant:
- * 
+ *
  *  <ul>
  *  <li>A component within the page hierarchy 
  *  <li>An {@link org.apache.tapestry.IAsset} from then assets map (property <code>assets</code>)
@@ -72,7 +69,7 @@ import org.apache.tapestry.util.prop.OgnlUtils;
  *  lifecycle (property <code>beans</code>)
  *  <li>A binding (property <code>bindings</code>)
  *  </ul>
- * 
+ *
  *  <p>
  *  These optimizations have some inherent dangers; they assume that
  *  the components have not overidden the specified properties;
@@ -80,11 +77,11 @@ import org.apache.tapestry.util.prop.OgnlUtils;
  *  component does inherit from {@link org.apache.tapestry.AbstractComponent}.
  *  If this becomes a problem in the future, it may be necessary to
  *  have the component itself involved in these determinations.
- *  
+ *
  *  @author Howard Lewis Ship
  *  @version $Id$
  *  @since 2.2
- * 
+ *
  **/
 
 public class ExpressionBinding extends AbstractBinding
@@ -106,7 +103,7 @@ public class ExpressionBinding extends AbstractBinding
     /**
      *  If true, then the binding is invariant, and cachedValue
      *  is the ultimate value.
-     * 
+     *
      **/
 
     private boolean _invariant = false;
@@ -114,25 +111,25 @@ public class ExpressionBinding extends AbstractBinding
     /**
      *  Stores the cached value for the binding, if invariant
      *  is true.
-     * 
+     *
      **/
 
     private Object _cachedValue;
 
     /**
      *   Parsed OGNL expression.
-     * 
+     *
      **/
 
-    private Object _parsedExpression;
+    private Node _parsedExpression;
 
     /**
      *  Flag set once the binding has initialized.
      *  _cachedValue, _invariant and _final value
      *  for _expression
      *  are not valid until after initialization.
-     * 
-     * 
+     *
+     *
      **/
 
     private boolean _initialized;
@@ -142,28 +139,47 @@ public class ExpressionBinding extends AbstractBinding
     /**
      *  The OGNL context for this binding.  It is retained
      *  for the lifespan of the binding once created.
-     * 
+     *
      **/
 
     private Map _context;
 
     /**
+     * Central OGNL expression manager.
+     */
+    private ExpressionEvaluator _evaluator;
+
+    /**
+     * Compiled OGNL expression.
+     */
+
+    private ExpressionAccessor _accessor;
+
+    /**
+     * Used to detect previous failed attempts at writing values when compiling expressions so
+     * that as many expressions as possible can be fully compiled into their java byte form when
+     * all objects in the expression are available.
+     */
+    private boolean _writeFailed;
+
+    /**
      *  Creates a {@link ExpressionBinding} from the root object
      *  and an OGNL expression.
-     * 
+     *
      **/
 
     public ExpressionBinding(
-        IResourceResolver resolver,
-        IComponent root,
-        String expression,
-        ILocation location)
+            IResourceResolver resolver,
+            IComponent root,
+            String expression,
+            ILocation location)
     {
         super(location);
 
         _resolver = resolver;
         _root = root;
         _expression = expression;
+        _evaluator = root.getPage().getEngine().getExpressionEvaluator();
     }
 
     public String getExpression()
@@ -198,17 +214,26 @@ public class ExpressionBinding extends AbstractBinding
     {
         try
         {
-            return Ognl.getValue(_parsedExpression, getOgnlContext(), _root);
+            if (false && _evaluator.isCompileEnabled() && _accessor == null && !_writeFailed)
+            {
+                _evaluator.compileExpression(_root, _parsedExpression, _expression);
+                _accessor = _parsedExpression.getAccessor();
+            }
+
+            if (_accessor != null)
+                return _evaluator.read(_root, _accessor);
+
+            return _evaluator.readCompiled(_root, _parsedExpression);
         }
-        catch (OgnlException t)
+        catch (Throwable t)
         {
             throw new BindingException(
-                Tapestry.format(
-                    "ExpressionBinding.unable-to-resolve-expression",
-                    _expression,
-                    _root),
-                this,
-                t);
+                    Tapestry.format(
+                            "ExpressionBinding.unable-to-resolve-expression",
+                            _expression,
+                            _root),
+                    this,
+                    t);
         }
     }
 
@@ -219,7 +244,7 @@ public class ExpressionBinding extends AbstractBinding
      *  An optional type converter will be added to the OGNL context
      *  if it is specified as an application extension with the name
      *  {@link Tapestry#OGNL_TYPE_CONVERTER}.
-     * 
+     *
      **/
 
     private Map getOgnlContext()
@@ -235,8 +260,7 @@ public class ExpressionBinding extends AbstractBinding
 
                 if (appSpec != null && appSpec.checkExtension(Tapestry.OGNL_TYPE_CONVERTER))
                 {
-                    TypeConverter typeConverter =
-                        (TypeConverter) appSpec.getExtension(
+                    TypeConverter typeConverter = (TypeConverter) appSpec.getExtension(
                             Tapestry.OGNL_TYPE_CONVERTER,
                             TypeConverter.class);
 
@@ -251,8 +275,8 @@ public class ExpressionBinding extends AbstractBinding
     /**
      *  Returns true if the binding is expected to always 
      *  return the same value.
-     * 
-     * 
+     *
+     *
      **/
 
     public boolean isInvariant()
@@ -297,7 +321,7 @@ public class ExpressionBinding extends AbstractBinding
 
         try
         {
-            _parsedExpression = OgnlUtils.getParsedExpression(_expression);
+            _parsedExpression = _evaluator.parse(_root, _expression);
         }
         catch (Exception ex)
         {
@@ -317,6 +341,7 @@ public class ExpressionBinding extends AbstractBinding
             throw new BindingException(ex.getMessage(), this, ex);
         }
 
+
         // Split the expression into individual property names.
         // We then optimize what we can from the expression.  This will
         // shorten the expression and, in some cases, eliminate
@@ -327,7 +352,7 @@ public class ExpressionBinding extends AbstractBinding
         int count = optimizeRootObject(split);
 
         // We'ver removed some or all of the initial elements of split
-        // but have to account for anthing left over.
+        // but have to account for anything left over.
 
         if (count == split.length)
         {
@@ -344,7 +369,7 @@ public class ExpressionBinding extends AbstractBinding
         }
 
         _expression = reassemble(count, split);
-        _parsedExpression = OgnlUtils.getParsedExpression(_expression);
+        _parsedExpression = _evaluator.parse(_root, _expression);
 
         checkForInvariant(count, split);
     }
@@ -352,10 +377,10 @@ public class ExpressionBinding extends AbstractBinding
     /**
      *  Looks for common prefixes on the expression (provided pre-split) that
      *  are recognized as references to other components.
-     * 
+     *
      *  @return the number of leading elements of the split expression that
      *  have been removed.
-     * 
+     *
      **/
 
     private int optimizeRootObject(String[] split)
@@ -398,26 +423,14 @@ public class ExpressionBinding extends AbstractBinding
 
     private boolean checkForConstant()
     {
-        try
-        {
-            if (Ognl.isConstant(_parsedExpression, getOgnlContext()))
-            {
-                _invariant = true;
 
-                _cachedValue = resolveProperty();
-
-                return true;
-            }
-        }
-        catch (OgnlException ex)
+        if (_evaluator.isConstant(_root, _expression))
         {
-            throw new BindingException(
-                Tapestry.format(
-                    "ExpressionBinding.unable-to-resolve-expression",
-                    _expression,
-                    _root),
-                this,
-                ex);
+            _invariant = true;
+
+            _cachedValue = resolveProperty();
+
+            return true;
         }
 
         return false;
@@ -426,7 +439,7 @@ public class ExpressionBinding extends AbstractBinding
     /**
      *  Reassembles the remainder of the split property path
      *  from the start point.
-     * 
+     *
      **/
 
     private String reassemble(int start, String[] split)
@@ -454,7 +467,7 @@ public class ExpressionBinding extends AbstractBinding
 
     /**
      *  Checks to see if the binding can be converted to an invariant.
-     * 
+     *
      **/
 
     private void checkForInvariant(int start, String[] split)
@@ -473,12 +486,12 @@ public class ExpressionBinding extends AbstractBinding
         catch (OgnlException ex)
         {
             throw new BindingException(
-                Tapestry.format(
-                    "ExpressionBinding.unable-to-resolve-expression",
-                    _expression,
-                    _root),
-                this,
-                ex);
+                    Tapestry.format(
+                            "ExpressionBinding.unable-to-resolve-expression",
+                            _expression,
+                            _root),
+                    this,
+                    ex);
         }
 
         String first = split[start];
@@ -550,18 +563,47 @@ public class ExpressionBinding extends AbstractBinding
 
         try
         {
-            Ognl.setValue(_parsedExpression, getOgnlContext(), _root, value);
+            if (_accessor != null)
+            {
+                _evaluator.write(_root, _accessor, value);
+            } else if (false && _evaluator.isCompileEnabled() && _accessor == null)
+            {
+                //_evaluator.compileExpression(_root, _parsedExpression, _expression);
+                //_accessor = _parsedExpression.getAccessor();
+
+                if (!_writeFailed)
+                {
+                    // re-parse expression as compilation may be possible now that it potentially has a value
+                    try
+                    {
+                        _evaluator.compileExpression(_root, _parsedExpression, _expression);
+                        _accessor = _parsedExpression.getAccessor();
+                    } catch (Throwable t)
+                    {
+                        // ignore re-read failures as they aren't supposed to be happening now anyways
+                        // and a more user friendly version will be available if someone actually calls
+                        // getObject
+
+                        // if writing fails then we're probably screwed...so don't do it again
+                        if (value != null)
+                            _writeFailed = true;
+                    }
+                }
+            } else
+            {
+                _evaluator.writeCompiled(_root, _parsedExpression, value);
+            }
         }
-        catch (OgnlException ex)
+        catch (Throwable ex)
         {
             throw new BindingException(
-                Tapestry.format(
-                    "ExpressionBinding.unable-to-update-expression",
-                    _expression,
-                    _root,
-                    value),
-                this,
-                ex);
+                    Tapestry.format(
+                            "ExpressionBinding.unable-to-update-expression",
+                            _expression,
+                            _root,
+                            value),
+                    this,
+                    ex);
         }
     }
 

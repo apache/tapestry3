@@ -17,7 +17,10 @@ package org.apache.tapestry.enhance.javassist;
 import javassist.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.tapestry.ApplicationRuntimeException;
+import org.apache.tapestry.Tapestry;
 import org.apache.tapestry.enhance.CodeGenerationException;
+import org.apache.tapestry.enhance.MethodSignature;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -87,7 +90,12 @@ public class ClassFabricator
             return null;
         }
     }
-    
+
+    public void addInterface(Class interfaceType)
+    {
+        _genClass.addInterface(getCtClass(interfaceType));
+    }
+
     public void createField(CtClass fieldType, String fieldName)
     {
         if (LOG.isDebugEnabled())
@@ -261,9 +269,79 @@ public class ClassFabricator
         }
     }
 
-    
+    public CtClass getCtClass(Class searchClass)
+    {
+        String name = ClassFabUtils.getJavaClassName(searchClass);
+        
+        try
+        {
+            return _classPool.get(name);
+        }
+        catch (NotFoundException ex)
+        {
+            throw new ApplicationRuntimeException(Tapestry.format("unable-to-lookup", name, ex), ex);
+        }
+    }
+
+    public void addMethod(int modifiers, MethodSignature ms, String body)
+    {
+        CtClass ctReturnType = getCtClass(ms.getReturnType());
+
+        CtClass[] ctParameters = convertClasses(ms.getParameterTypes());
+        CtClass[] ctExceptions = convertClasses(ms.getExceptionTypes());
+
+        CtMethod method = new CtMethod(ctReturnType, ms.getName(), ctParameters, _genClass);
+
+        try {
+            method.setModifiers(modifiers);
+            method.setBody(body);
+            method.setExceptionTypes(ctExceptions);
+
+            _genClass.addMethod(method);
+        } catch (Exception ex)
+        {
+            throw new CodeGenerationException(ex);
+        }
+    }
+
+    public void addConstructor(Class[] parameterTypes, Class[] exceptions, String body)
+    {
+        CtClass[] ctParameters = convertClasses(parameterTypes);
+        CtClass[] ctExceptions = convertClasses(exceptions);
+
+        try
+        {
+            CtConstructor constructor = new CtConstructor(ctParameters, _genClass);
+            constructor.setExceptionTypes(ctExceptions);
+            constructor.setBody(body);
+
+            _genClass.addConstructor(constructor);
+        } catch (Exception ex) 
+        {
+            throw new CodeGenerationException(ex);
+        }
+    }
+
     public void commit()
     {
+    }
+
+    protected CtClass[] convertClasses(Class[] inputClasses)
+    {
+        if (inputClasses == null || inputClasses.length == 0)
+            return null;
+
+        int count = inputClasses.length;
+        CtClass[] result = new CtClass[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            CtClass ctClass = getCtClass(inputClasses[i]);
+
+            result[i] = ctClass;
+        }
+
+        return result;
     }
 
     public byte[] getByteCode()

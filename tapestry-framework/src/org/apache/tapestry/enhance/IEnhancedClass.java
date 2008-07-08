@@ -51,4 +51,22 @@ public interface IEnhancedClass
      * Adds an arbitrary enhancer.
      */
     void addEnhancer(IEnhancer enhancer);
+
+    void addInterface(Class type);
+
+    void addMethod(int modifiers, MethodSignature signature, String body);
+
+    void addField(String name, Class type);
+    
+    void addConstructor(Class[] parameterTypes, Class[] exceptions, String body);
+
+    /**
+     * Returns true if the same method was previously added via
+     * {@link #addMethod(int, MethodSignature, String)}.
+     *
+     * @param signature
+     *          The signature to check existance of.
+     * @return True if the same method has been added already, false otherwise.
+     */
+    boolean containsMethod(MethodSignature signature);
 }
