@@ -23,6 +23,8 @@ import org.apache.tapestry.*;
 import org.apache.tapestry.asset.ResourceChecksumSource;
 import org.apache.tapestry.asset.ResourceChecksumSourceImpl;
 import org.apache.tapestry.enhance.DefaultComponentClassEnhancer;
+import org.apache.tapestry.enhance.IEnhancedClassFactory;
+import org.apache.tapestry.enhance.javassist.EnhancedClassFactory;
 import org.apache.tapestry.listener.ListenerMap;
 import org.apache.tapestry.pageload.PageSource;
 import org.apache.tapestry.request.RequestContext;
@@ -390,6 +392,10 @@ public abstract class AbstractEngine
 
     private transient IComponentClassEnhancer _enhancer;
 
+    protected static final String CLASS_FACTORY_NAME = "org.apache.tapestry.enhance.javassist.EnhancedClassFactory";
+
+    private transient IEnhancedClassFactory _classFactory;
+
     /**
      *  Set to true when there is a (potential)
      *  change to the internal state of the engine, set
@@ -415,6 +421,18 @@ public abstract class AbstractEngine
      * @since 3.0.3
      */
     private transient ResourceChecksumSource _resourceChecksumSource;
+
+    /**
+     *  The name of the context attribute for the {@link ExpressionEvaluator} instance.
+     *  The application's name is appended.
+     **/
+    protected static final String EXPRESSION_EVALUATOR_NAME = "org.apache.tapestry.engine.ExpressionEvaluator";
+
+    private transient ExpressionEvaluator _expressionEvaluator;
+
+    private transient ExpressionCache _expressionCache;
+
+    private transient String _outputEncoding;
 
     /**
      *  Sets the Exception page's exception property, then renders the Exception page.
@@ -1109,6 +1127,9 @@ public abstract class AbstractEngine
         _stringsSource.reset();
         _enhancer.reset();
         _resourceChecksumSource.reset();
+        _expressionCache.reset();
+        _expressionEvaluator.reset();
+        _outputEncoding = null;
     }
 
     /**
@@ -1241,6 +1262,33 @@ public abstract class AbstractEngine
                         _propertySource = createPropertySource(context);
 
                         servletContext.setAttribute(name, _propertySource);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
+            }
+        }
+
+        if (_classFactory == null)
+        {
+            String name = CLASS_FACTORY_NAME + ":" + servletName;
+
+            _classFactory = (IEnhancedClassFactory) servletContext.getAttribute(name);
+
+            if (_classFactory == null)
+            {
+                try
+                {
+                    context.getServlet().getLock().lock();
+
+                    _classFactory = (IEnhancedClassFactory) servletContext.getAttribute(name);
+
+                    if (_classFactory == null)
+                    {
+                        _classFactory = createClassFactory();
+
+                        servletContext.setAttribute(name, _classFactory);
                     }
                 } finally
                 {
@@ -1546,6 +1594,33 @@ public abstract class AbstractEngine
             }
         }
 
+        if (_expressionEvaluator == null)
+        {
+            String name = EXPRESSION_EVALUATOR_NAME + ":" + servletName;
+
+            _expressionEvaluator = (ExpressionEvaluator) servletContext.getAttribute(name);
+
+            if (_expressionEvaluator == null)
+            {
+                try
+                {
+                    context.getServlet().getLock().lock();
+
+                    _expressionEvaluator = (ExpressionEvaluator) servletContext.getAttribute(name);
+
+                    if (_expressionEvaluator == null)
+                    {
+                        _expressionEvaluator = createExpressionEvaluator();
+
+                        servletContext.setAttribute(name, _expressionEvaluator);
+                    }
+                } finally
+                {
+                    context.getServlet().getLock().unlock();
+                }
+            }
+        }
+
         String encoding = request.getCharacterEncoding();
         if (encoding == null)
         {
@@ -1662,6 +1737,18 @@ public abstract class AbstractEngine
     {
         return new ResourceChecksumSourceImpl("MD5", new Hex());
     }
+    
+    protected ExpressionEvaluator createExpressionEvaluator()
+    {
+        _expressionCache = (ExpressionCacheImpl) createExpressionCache();
+
+        return new ExpressionEvaluatorImpl(_resolver, _classFactory, _expressionCache, _specification);
+    }
+
+    protected ExpressionCache createExpressionCache()
+    {
+        return new ExpressionCacheImpl();
+    }
 
     /**
      *  Returns an object which can find resources and classes.
@@ -1671,6 +1758,11 @@ public abstract class AbstractEngine
     public IResourceResolver getResourceResolver()
     {
         return _resolver;
+    }
+
+    public ExpressionEvaluator getExpressionEvaluator()
+    {
+        return _expressionEvaluator;
     }
 
     /**
@@ -2378,10 +2470,15 @@ public abstract class AbstractEngine
                 "true".equals(
                         _propertySource.getPropertyValue(
                                 "org.apache.tapestry.enhance.disable-abstract-method-validation"));
-
-        return new DefaultComponentClassEnhancer(_resolver, disableValidation);
+        
+        return new DefaultComponentClassEnhancer(_resolver, disableValidation, _classFactory);
     }
 
+    protected IEnhancedClassFactory createClassFactory()
+    {
+        return new EnhancedClassFactory(_resolver);
+    }
+    
     /** @since 3.0 **/
 
     public IComponentClassEnhancer getComponentClassEnhancer()
@@ -2478,13 +2575,18 @@ public abstract class AbstractEngine
      **/
     public String getOutputEncoding()
     {
+        if (_outputEncoding != null)
+            return _outputEncoding;
+        
         IPropertySource source = getPropertySource();
 
         String encoding = source.getPropertyValue(OUTPUT_ENCODING_PROPERTY_NAME);
         if (encoding == null)
             encoding = getDefaultOutputEncoding();
 
-        return encoding;
+        _outputEncoding = encoding;
+
+        return _outputEncoding;
     }
 
 }

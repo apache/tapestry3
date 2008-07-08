@@ -14,31 +14,24 @@
 
 package org.apache.tapestry;
 
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tapestry.binding.ExpressionBinding;
 import org.apache.tapestry.binding.StaticBinding;
 import org.apache.tapestry.binding.StringBinding;
+import org.apache.tapestry.engine.ExpressionEvaluator;
 import org.apache.tapestry.engine.IPageLoader;
 import org.apache.tapestry.engine.IPageSource;
 import org.apache.tapestry.engine.ITemplateSource;
-import org.apache.tapestry.parse.AttributeType;
-import org.apache.tapestry.parse.CloseToken;
-import org.apache.tapestry.parse.ComponentTemplate;
-import org.apache.tapestry.parse.LocalizationToken;
-import org.apache.tapestry.parse.OpenToken;
-import org.apache.tapestry.parse.TemplateAttribute;
-import org.apache.tapestry.parse.TemplateToken;
-import org.apache.tapestry.parse.TextToken;
-import org.apache.tapestry.parse.TokenType;
+import org.apache.tapestry.parse.*;
 import org.apache.tapestry.spec.IComponentSpecification;
 import org.apache.tapestry.spec.IContainedComponent;
+
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 
 /**
  *  Utility class instantiated by {@link org.apache.tapestry.BaseComponent} to
@@ -65,6 +58,7 @@ public class BaseComponentTemplateLoader
     private IComponent[] _stack;
     private int _stackx = 0;
     private IComponent _activeComponent = null;
+    private ExpressionEvaluator _evaluator;
     private Set _seenIds = new HashSet();
 
     /**
