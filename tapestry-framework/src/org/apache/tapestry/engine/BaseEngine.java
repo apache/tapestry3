@@ -26,33 +26,26 @@ import java.io.ObjectOutput;
 import java.util.*;
 
 /**
- *  Concrete implementation of {@link org.apache.tapestry.IEngine} used for ordinary
- *  applications.  All page state information is maintained in
- *  the {@link javax.servlet.http.HttpSession} using
- *  instances of {@link org.apache.tapestry.record.SessionPageRecorder}.
+ * Concrete implementation of {@link org.apache.tapestry.IEngine} used for ordinary applications.  All page state
+ * information is maintained in the {@link javax.servlet.http.HttpSession} using instances of {@link
+ * org.apache.tapestry.record.SessionPageRecorder}.
  *
- *  @author Howard Lewis Ship
- *  @version $Id$
- *
- **/
+ * @author Howard Lewis Ship
+ * @version $Id$
+ */
 
 public class BaseEngine extends AbstractEngine
 {
     private static final long serialVersionUID = -7051050643746333380L;
-
-    private final static int MAP_SIZE = 3;
 
     private transient Map _recorders;
 
     private transient Set _activePageNames;
 
     /**
-     *  Removes all page recorders that contain no changes, or
-     *  are marked for discard.  Subclasses
-     *  should invoke this implementation in addition to providing
-     *  thier own.
-     *
-     **/
+     * Removes all page recorders that contain no changes, or are marked for discard.  Subclasses should invoke this
+     * implementation in addition to providing thier own.
+     */
 
     protected void cleanupAfterRequest(IRequestCycle cycle)
     {
@@ -105,11 +98,8 @@ public class BaseEngine extends AbstractEngine
     }
 
     /**
-     *  Returns an unmodifiable {@link Collection} of the page names for which
-     *  {@link IPageRecorder} instances exist.
-     *
-     *
-     **/
+     * Returns an unmodifiable {@link Collection} of the page names for which {@link IPageRecorder} instances exist.
+     */
 
     public Collection getActivePageNames()
     {
@@ -170,10 +160,8 @@ public class BaseEngine extends AbstractEngine
     }
 
     /**
-     *  Reconstructs the list of active page names
-     *  written by {@link #writeExternal(ObjectOutput)}.
-     *
-     **/
+     * Reconstructs the list of active page names written by {@link #writeExternal(ObjectOutput)}.
+     */
 
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException
     {
@@ -194,11 +182,9 @@ public class BaseEngine extends AbstractEngine
     }
 
     /**
-     *  Writes the engine's persistent state; this is simply the list of active page
-     *  names.  For efficiency, this is written as a count followed by each name
-     *  as a UTF String.
-     *
-     **/
+     * Writes the engine's persistent state; this is simply the list of active page names.  For efficiency, this is
+     * written as a count followed by each name as a UTF String.
+     */
 
     public void writeExternal(ObjectOutput out) throws IOException
     {
