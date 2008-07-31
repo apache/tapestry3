@@ -13,7 +13,7 @@
         <version>3.0.5-SNAPSHOT</version>
     </parent>
     <name>Contrib</name>
-    <inceptionYear>2006</inceptionYear>
+    <inceptionYear>2003</inceptionYear>
 
     <dependencies>
         <dependency>
