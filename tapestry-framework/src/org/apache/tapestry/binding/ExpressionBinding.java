@@ -29,118 +29,87 @@ import org.apache.tapestry.util.StringSplitter;
 import java.util.Map;
 
 /**
- *  Implements a dynamic binding, based on getting and fetching
- *  values using JavaBeans property access.  This is built
- *  upon the <a href="http://www.ognl.org">OGNL</a> library.
+ * Implements a dynamic binding, based on getting and fetching values using JavaBeans property access.  This is built
+ * upon the <a href="http://www.ognl.org">OGNL</a> library.
+ * <p/>
+ * <p><b>Optimization of the Expression</b>
+ * <p/>
+ * <p>There's a lot of room for optimization here because we can count on some portions of the expression to be
+ * effectively static.  Note that we type the root object as {@link IComponent}.  We have some expectations that certain
+ * properties of the root (and properties reachable from the root) will be constant for the lifetime of the binding. For
+ * example, components never change thier page or container.  This means that certain property prefixes can be
+ * optimized:
+ * <p/>
+ * <ul> <li>page <li>container <li>components.<i>name</i> </ul>
+ * <p/>
+ * <p>This means that once an ExpressionBinding has been triggered, the {@link #toString()} method may return different
+ * values for the root component and the expression than was originally set.
+ * <p/>
+ * <p><b>Identifying Invariants</b>
+ * <p/>
+ * <p>Most expressions are fully dynamic; they must be resolved each time they are accessed.  This can be somewhat
+ * inefficient. Tapestry can identify certain paths as invariant:
+ * <p/>
+ * <ul> <li>A component within the page hierarchy <li>An {@link org.apache.tapestry.IAsset} from then assets map
+ * (property <code>assets</code>) <li>A {@link org.apache.tapestry.IActionListener} from the listener map (property
+ * <code>listeners</code>) <li>A bean with a {@link org.apache.tapestry.spec.BeanLifecycle#PAGE} lifecycle (property
+ * <code>beans</code>) <li>A binding (property <code>bindings</code>) </ul>
+ * <p/>
+ * <p/>
+ * These optimizations have some inherent dangers; they assume that the components have not overidden the specified
+ * properties; the last one (concerning helper beans) assumes that the component does inherit from {@link
+ * org.apache.tapestry.AbstractComponent}. If this becomes a problem in the future, it may be necessary to have the
+ * component itself involved in these determinations.
  *
- *  <p><b>Optimization of the Expression</b>
- *
- *  <p>There's a lot of room for optimization here because we can
- *  count on some portions of the expression to be
- *  effectively static.  Note that we type the root object as
- *  {@link IComponent}.  We have some expectations that
- *  certain properties of the root (and properties reachable from the root)
- *  will be constant for the lifetime of the binding.  For example, 
- *  components never change thier page or container.  This means
- *  that certain property prefixes can be optimized:
- *
- *  <ul>
- *  <li>page
- *  <li>container
- *  <li>components.<i>name</i>
- *  </ul>
- *
- *  <p>This means that once an ExpressionBinding has been triggered, 
- *  the {@link #toString()} method may return different values for the root
- *  component and the expression than was originally set.
- *
- *  <p><b>Identifying Invariants</b>
- *
- *  <p>Most expressions are fully dynamic; they must be
- *  resolved each time they are accessed.  This can be somewhat inefficient.
- *  Tapestry can identify certain paths as invariant:
- *
- *  <ul>
- *  <li>A component within the page hierarchy 
- *  <li>An {@link org.apache.tapestry.IAsset} from then assets map (property <code>assets</code>)
- *  <li>A {@link org.apache.tapestry.IActionListener}
- *  from the listener map (property <code>listeners</code>)
- *  <li>A bean with a {@link org.apache.tapestry.spec.BeanLifecycle#PAGE}
- *  lifecycle (property <code>beans</code>)
- *  <li>A binding (property <code>bindings</code>)
- *  </ul>
- *
- *  <p>
- *  These optimizations have some inherent dangers; they assume that
- *  the components have not overidden the specified properties;
- *  the last one (concerning helper beans) assumes that the
- *  component does inherit from {@link org.apache.tapestry.AbstractComponent}.
- *  If this becomes a problem in the future, it may be necessary to
- *  have the component itself involved in these determinations.
- *
- *  @author Howard Lewis Ship
- *  @version $Id$
- *  @since 2.2
- *
- **/
+ * @author Howard Lewis Ship
+ * @version $Id$
+ * @since 2.2
+ */
 
 public class ExpressionBinding extends AbstractBinding
 {
     /**
-     *  The root object against which the nested property name is evaluated.
-     *
-     **/
+     * The root object against which the nested property name is evaluated.
+     */
 
     private IComponent _root;
 
     /**
-     *  The OGNL expression, as a string.
-     *
-     **/
+     * The OGNL expression, as a string.
+     */
 
     private String _expression;
 
     /**
-     *  If true, then the binding is invariant, and cachedValue
-     *  is the ultimate value.
-     *
-     **/
+     * If true, then the binding is invariant, and cachedValue is the ultimate value.
+     */
 
     private boolean _invariant = false;
 
     /**
-     *  Stores the cached value for the binding, if invariant
-     *  is true.
-     *
-     **/
+     * Stores the cached value for the binding, if invariant is true.
+     */
 
     private Object _cachedValue;
 
     /**
-     *   Parsed OGNL expression.
-     *
-     **/
+     * Parsed OGNL expression.
+     */
 
     private Node _parsedExpression;
 
     /**
-     *  Flag set once the binding has initialized.
-     *  _cachedValue, _invariant and _final value
-     *  for _expression
-     *  are not valid until after initialization.
-     *
-     *
-     **/
+     * Flag set once the binding has initialized. _cachedValue, _invariant and _final value for _expression are not
+     * valid until after initialization.
+     */
 
     private boolean _initialized;
 
     private IResourceResolver _resolver;
 
     /**
-     *  The OGNL context for this binding.  It is retained
-     *  for the lifespan of the binding once created.
-     *
-     **/
+     * The OGNL context for this binding.  It is retained for the lifespan of the binding once created.
+     */
 
     private Map _context;
 
@@ -156,17 +125,19 @@ public class ExpressionBinding extends AbstractBinding
     private ExpressionAccessor _accessor;
 
     /**
-     * Used to detect previous failed attempts at writing values when compiling expressions so
-     * that as many expressions as possible can be fully compiled into their java byte form when
-     * all objects in the expression are available.
+     * Used to detect previous failed attempts at writing values when compiling expressions so that as many expressions
+     * as possible can be fully compiled into their java byte form when all objects in the expression are available.
      */
     private boolean _writeFailed;
 
     /**
-     *  Creates a {@link ExpressionBinding} from the root object
-     *  and an OGNL expression.
-     *
-     **/
+     * This is current set to false, to prevent any attempts at bytecode compilation of OGNL expressions.
+     */
+    private static final boolean EXPRESSION_EVALUATION_ENABLED = false;
+
+    /**
+     * Creates a {@link ExpressionBinding} from the root object and an OGNL expression.
+     */
 
     public ExpressionBinding(
             IResourceResolver resolver,
@@ -193,12 +164,10 @@ public class ExpressionBinding extends AbstractBinding
     }
 
     /**
-     *  Gets the value of the property path, with the assistance of a 
-     *  OGNL.
+     * Gets the value of the property path, with the assistance of a OGNL.
      *
-     *  @throws BindingException if an exception is thrown accessing the property.
-     *
-     **/
+     * @throws BindingException if an exception is thrown accessing the property.
+     */
 
     public Object getObject()
     {
@@ -214,7 +183,7 @@ public class ExpressionBinding extends AbstractBinding
     {
         try
         {
-            if (false && _evaluator.isCompileEnabled() && _accessor == null && !_writeFailed)
+            if (EXPRESSION_EVALUATION_ENABLED && _evaluator.isCompileEnabled() && _accessor == null && !_writeFailed)
             {
                 _evaluator.compileExpression(_root, _parsedExpression, _expression);
                 _accessor = _parsedExpression.getAccessor();
@@ -238,14 +207,10 @@ public class ExpressionBinding extends AbstractBinding
     }
 
     /**
-     *  Creates an OGNL context used to get or set a value.
-     *  We may extend this in the future to set additional
-     *  context variables (such as page, request cycle and engine).
-     *  An optional type converter will be added to the OGNL context
-     *  if it is specified as an application extension with the name
-     *  {@link Tapestry#OGNL_TYPE_CONVERTER}.
-     *
-     **/
+     * Creates an OGNL context used to get or set a value. We may extend this in the future to set additional context
+     * variables (such as page, request cycle and engine). An optional type converter will be added to the OGNL context
+     * if it is specified as an application extension with the name {@link Tapestry#OGNL_TYPE_CONVERTER}.
+     */
 
     private Map getOgnlContext()
     {
@@ -273,11 +238,8 @@ public class ExpressionBinding extends AbstractBinding
     }
 
     /**
-     *  Returns true if the binding is expected to always 
-     *  return the same value.
-     *
-     *
-     **/
+     * Returns true if the binding is expected to always return the same value.
+     */
 
     public boolean isInvariant()
     {
@@ -307,10 +269,8 @@ public class ExpressionBinding extends AbstractBinding
     }
 
     /**
-     *  Sets up the helper object, but also optimizes the property path
-     *  and determines if the binding is invarant.
-     *
-     **/
+     * Sets up the helper object, but also optimizes the property path and determines if the binding is invarant.
+     */
 
     private void initialize()
     {
@@ -340,7 +300,6 @@ public class ExpressionBinding extends AbstractBinding
         {
             throw new BindingException(ex.getMessage(), this, ex);
         }
-
 
         // Split the expression into individual property names.
         // We then optimize what we can from the expression.  This will
@@ -375,13 +334,11 @@ public class ExpressionBinding extends AbstractBinding
     }
 
     /**
-     *  Looks for common prefixes on the expression (provided pre-split) that
-     *  are recognized as references to other components.
+     * Looks for common prefixes on the expression (provided pre-split) that are recognized as references to other
+     * components.
      *
-     *  @return the number of leading elements of the split expression that
-     *  have been removed.
-     *
-     **/
+     * @return the number of leading elements of the split expression that have been removed.
+     */
 
     private int optimizeRootObject(String[] split)
     {
@@ -437,10 +394,8 @@ public class ExpressionBinding extends AbstractBinding
     }
 
     /**
-     *  Reassembles the remainder of the split property path
-     *  from the start point.
-     *
-     **/
+     * Reassembles the remainder of the split property path from the start point.
+     */
 
     private String reassemble(int start, String[] split)
     {
@@ -466,9 +421,8 @@ public class ExpressionBinding extends AbstractBinding
     }
 
     /**
-     *  Checks to see if the binding can be converted to an invariant.
-     *
-     **/
+     * Checks to see if the binding can be converted to an invariant.
+     */
 
     private void checkForInvariant(int start, String[] split)
     {
@@ -547,12 +501,12 @@ public class ExpressionBinding extends AbstractBinding
     }
 
     /**
-     *  Updates the property for the binding to the given value.  
+     * Updates the property for the binding to the given value.
      *
-     *  @throws BindingException if the property can't be updated (typically
-     *  due to an security problem, or a missing mutator method).
-     *  @throws BindingException if the binding is invariant.
-     **/
+     * @throws BindingException if the property can't be updated (typically due to an security problem, or a missing
+     *                          mutator method).
+     * @throws BindingException if the binding is invariant.
+     */
 
     public void setObject(Object value)
     {
@@ -566,7 +520,8 @@ public class ExpressionBinding extends AbstractBinding
             if (_accessor != null)
             {
                 _evaluator.write(_root, _accessor, value);
-            } else if (false && _evaluator.isCompileEnabled() && _accessor == null)
+            }
+            else if (EXPRESSION_EVALUATION_ENABLED && _evaluator.isCompileEnabled() && _accessor == null)
             {
                 //_evaluator.compileExpression(_root, _parsedExpression, _expression);
                 //_accessor = _parsedExpression.getAccessor();
@@ -578,7 +533,8 @@ public class ExpressionBinding extends AbstractBinding
                     {
                         _evaluator.compileExpression(_root, _parsedExpression, _expression);
                         _accessor = _parsedExpression.getAccessor();
-                    } catch (Throwable t)
+                    }
+                    catch (Throwable t)
                     {
                         // ignore re-read failures as they aren't supposed to be happening now anyways
                         // and a more user friendly version will be available if someone actually calls
@@ -589,7 +545,8 @@ public class ExpressionBinding extends AbstractBinding
                             _writeFailed = true;
                     }
                 }
-            } else
+            }
+            else
             {
                 _evaluator.writeCompiled(_root, _parsedExpression, value);
             }
@@ -608,12 +565,10 @@ public class ExpressionBinding extends AbstractBinding
     }
 
     /**
-     *  Returns the a String representing the property path.  This includes
-     *  the {@link IComponent#getExtendedId() extended id} of the root component
-     *  and the property path ... once the binding is used, these may change
-     *  due to optimization of the property path.
-     *
-     **/
+     * Returns the a String representing the property path.  This includes the {@link IComponent#getExtendedId()
+     * extended id} of the root component and the property path ... once the binding is used, these may change due to
+     * optimization of the property path.
+     */
 
     public String toString()
     {

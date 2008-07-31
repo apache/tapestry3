@@ -14,7 +14,6 @@
 
 package org.apache.tapestry;
 
-import edu.emory.mathcs.backport.java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tapestry.engine.BaseEngine;
@@ -39,141 +38,108 @@ import java.io.InputStream;
 import java.util.Locale;
 
 /**
- *  Links a servlet container with a Tapestry application.  The servlet has some
- *  responsibilities related to bootstrapping the application (in terms of
- *  logging, reading the {@link ApplicationSpecification specification}, etc.).
- *  It is also responsible for creating or locating the {@link IEngine} and delegating
- *  incoming requests to it.
- * 
- *  <p>The servlet init parameter
- *  <code>org.apache.tapestry.specification-path</code>
- *  should be set to the complete resource path (within the classpath)
- *  to the application specification, i.e.,
- *  <code>/com/foo/bar/MyApp.application</code>. 
+ * Links a servlet container with a Tapestry application.  The servlet has some responsibilities related to
+ * bootstrapping the application (in terms of logging, reading the {@link ApplicationSpecification specification},
+ * etc.). It is also responsible for creating or locating the {@link IEngine} and delegating incoming requests to it.
+ * <p/>
+ * <p>The servlet init parameter <code>org.apache.tapestry.specification-path</code> should be set to the complete
+ * resource path (within the classpath) to the application specification, i.e., <code>/com/foo/bar/MyApp.application</code>.
+ * <p/>
+ * <p>In some servlet containers (notably <a href="www.bea.com"/>WebLogic</a>) it is necessary to invoke {@link
+ * HttpSession#setAttribute(String,Object)} in order to force a persistent value to be replicated to the other servers
+ * in the cluster.  Tapestry applications usually only have a single persistent value, the {@link IEngine engine}.  For
+ * persistence to work in such an environment, the JVM system property <code>org.apache.tapestry.store-engine</code>
+ * must be set to <code>true</code>.  This will force the application servlet to restore the engine into the {@link
+ * HttpSession} at the end of each request cycle.
+ * <p/>
+ * <p>As of release 1.0.1, it is no longer necessary for a {@link HttpSession} to be created on the first request cycle.
+ * Instead, the HttpSession is created as needed by the {@link IEngine} ... that is, when a visit object is created, or
+ * when persistent page state is required.  Otherwise, for sessionless requests, an {@link IEngine} from a {@link Pool}
+ * is used.  Additional work must be done so that the {@link IEngine} can change locale <em>without</em> forcing the
+ * creation of a session; this involves the servlet and the engine storing locale information in a {@link Cookie}.
  *
- *  <p>In some servlet containers (notably
- *  <a href="www.bea.com"/>WebLogic</a>)
- *  it is necessary to invoke {@link HttpSession#setAttribute(String,Object)}
- *  in order to force a persistent value to be replicated to the other
- *  servers in the cluster.  Tapestry applications usually only have a single
- *  persistent value, the {@link IEngine engine}.  For persistence to
- *  work in such an environment, the
- *  JVM system property <code>org.apache.tapestry.store-engine</code>
- *  must be set to <code>true</code>.  This will force the application
- *  servlet to restore the engine into the {@link HttpSession} at the
- *  end of each request cycle.
- * 
- *  <p>As of release 1.0.1, it is no longer necessary for a {@link HttpSession}
- *  to be created on the first request cycle.  Instead, the HttpSession is created
- *  as needed by the {@link IEngine} ... that is, when a visit object is created,
- *  or when persistent page state is required.  Otherwise, for sessionless requests,
- *  an {@link IEngine} from a {@link Pool} is used.  Additional work must be done
- *  so that the {@link IEngine} can change locale <em>without</em> forcing 
- *  the creation of a session; this involves the servlet and the engine storing
- *  locale information in a {@link Cookie}.
- * 
- *  @version $Id$
- *  @author Howard Lewis Ship
- * 
- **/
+ * @author Howard Lewis Ship
+ * @version $Id$
+ */
 
 public class ApplicationServlet extends HttpServlet
 {
     private static final Log LOG = LogFactory.getLog(ApplicationServlet.class);
 
-    /** @since 2.3 **/
+    /**
+     * @since 2.3 *
+     */
 
     private static final String APP_SPEC_PATH_PARAM =
-        "org.apache.tapestry.application-specification";
+            "org.apache.tapestry.application-specification";
 
     /**
-     *  Name of the cookie written to the client web browser to
-     *  identify the locale.
-     *
-     **/
+     * Name of the cookie written to the client web browser to identify the locale.
+     */
 
     private static final String LOCALE_COOKIE_NAME = "org.apache.tapestry.locale";
 
     /**
-     *  A {@link Pool} used to store {@link IEngine engine}s that are not currently
-     *  in use.  The key is on {@link Locale}.
-     *
-     **/
+     * A {@link Pool} used to store {@link IEngine engine}s that are not currently in use.  The key is on {@link
+     * Locale}.
+     */
 
     private Pool _enginePool = new Pool();
 
     /**
-     *  The application specification, which is read once and kept in memory
-     *  thereafter.
-     *
-     **/
+     * The application specification, which is read once and kept in memory thereafter.
+     */
 
     private IApplicationSpecification _specification;
 
     /**
-     * The name under which the {@link IEngine engine} is stored within the
-     * {@link HttpSession}.
-     *
-     **/
+     * The name under which the {@link IEngine engine} is stored within the {@link HttpSession}.
+     */
 
     private String _attributeName;
 
     /**
-     *  The resolved class name used to instantiate the engine.
-     * 
-     *  @since 3.0
-     * 
-     **/
+     * The resolved class name used to instantiate the engine.
+     *
+     * @since 3.0
+     */
 
     private String _engineClassName;
 
     /**
-     *  Used to search for configuration properties.
-     * 
-     *  
-     *  @since 3.0
-     * 
-     **/
+     * Used to search for configuration properties.
+     *
+     * @since 3.0
+     */
 
     private IPropertySource _propertySource;
 
     /**
-     * Global lock used to synchronize global thread access to commonly shared
-     * services / data structures.
+     * Invokes {@link #doService(HttpServletRequest, HttpServletResponse)}.
+     *
+     * @since 1.0.6
      */
-    private ReentrantLock _lock = new ReentrantLock();
-
-    /**
-     *  Invokes {@link #doService(HttpServletRequest, HttpServletResponse)}.
-     *
-     *  @since 1.0.6
-     *
-     **/
 
     public void doGet(HttpServletRequest request, HttpServletResponse response)
-        throws IOException, ServletException
+            throws IOException, ServletException
     {
         doService(request, response);
     }
 
     /**
-     *  @since 2.3
-     * 
-     **/
+     * @since 2.3
+     */
 
     private IResourceResolver _resolver;
 
     /**
-     * Handles the GET and POST requests. Performs the following:
-     * <ul>
-     * <li>Construct a {@link RequestContext}
-     * <li>Invoke {@link #getEngine(RequestContext)} to get or create the {@link IEngine}
-     * <li>Invoke {@link IEngine#service(RequestContext)} on the application
-     * </ul>
-     **/
+     * Handles the GET and POST requests. Performs the following: <ul> <li>Construct a {@link RequestContext} <li>Invoke
+     * {@link #getEngine(RequestContext)} to get or create the {@link IEngine} <li>Invoke {@link
+     * IEngine#service(RequestContext)} on the application </ul>
+     */
 
     protected void doService(HttpServletRequest request, HttpServletResponse response)
-        throws IOException, ServletException
+            throws IOException, ServletException
     {
         RequestContext context = null;
 
@@ -189,7 +155,7 @@ public class ApplicationServlet extends HttpServlet
 
             if (engine == null)
                 throw new ServletException(
-                    Tapestry.getMessage("ApplicationServlet.could-not-locate-engine"));
+                        Tapestry.getMessage("ApplicationServlet.could-not-locate-engine"));
 
             boolean dirty = engine.service(context);
 
@@ -210,7 +176,7 @@ public class ApplicationServlet extends HttpServlet
                 {
 
                     boolean forceStore =
-                        engine.isStateful() && (session.getAttribute(_attributeName) == null);
+                            engine.isStateful() && (session.getAttribute(_attributeName) == null);
 
                     if (forceStore || dirty)
                     {
@@ -239,9 +205,9 @@ public class ApplicationServlet extends HttpServlet
             if (engine.isStateful())
             {
                 LOG.error(
-                    Tapestry.format(
-                        "ApplicationServlet.engine-stateful-without-session",
-                        engine));
+                        Tapestry.format(
+                                "ApplicationServlet.engine-stateful-without-session",
+                                engine));
                 return;
             }
 
@@ -285,18 +251,17 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Invoked by {@link #doService(HttpServletRequest, HttpServletResponse)} to create
-     *  the {@link RequestContext} for this request cycle.  Some applications may need to
-     *  replace the default RequestContext with a subclass for particular behavior.
-     * 
-     *  @since 2.3
-     * 
-     **/
+     * Invoked by {@link #doService(HttpServletRequest, HttpServletResponse)} to create the {@link RequestContext} for
+     * this request cycle.  Some applications may need to replace the default RequestContext with a subclass for
+     * particular behavior.
+     *
+     * @since 2.3
+     */
 
     protected RequestContext createRequestContext(
-        HttpServletRequest request,
-        HttpServletResponse response)
-        throws IOException
+            HttpServletRequest request,
+            HttpServletResponse response)
+            throws IOException
     {
         return new RequestContext(this, request, response);
     }
@@ -312,22 +277,18 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Invokes {@link #doService(HttpServletRequest, HttpServletResponse)}.
-     *
-     *
-     **/
+     * Invokes {@link #doService(HttpServletRequest, HttpServletResponse)}.
+     */
 
     public void doPost(HttpServletRequest request, HttpServletResponse response)
-        throws IOException, ServletException
+            throws IOException, ServletException
     {
         doService(request, response);
     }
 
     /**
-     *  Returns the application specification, which is read
-     *  by the {@link #init(ServletConfig)} method.
-     *
-     **/
+     * Returns the application specification, which is read by the {@link #init(ServletConfig)} method.
+     */
 
     public IApplicationSpecification getApplicationSpecification()
     {
@@ -335,25 +296,10 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     * Used internally to synchronize access to creation of shared services.
-     *
-     * @return The global shared lock.
+     * Retrieves the {@link IEngine engine} that will process this request.  This comes from one of the following
+     * places: <ul> <li>The {@link HttpSession}, if the there is one. <li>From the pool of available engines <li>Freshly
+     * created </ul>
      */
-    public ReentrantLock getLock()
-    {
-        return _lock;
-    }
-
-    /**
-     *  Retrieves the {@link IEngine engine} that will process this
-     *  request.  This comes from one of the following places:
-     *  <ul>
-     *  <li>The {@link HttpSession}, if the there is one.
-     *  <li>From the pool of available engines
-     *  <li>Freshly created
-     *  </ul>
-     *
-     **/
 
     protected IEngine getEngine(RequestContext context) throws ServletException
     {
@@ -396,12 +342,9 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Determines the {@link Locale} for the incoming request.
-     *  This is determined from the locale cookie or, if not set,
-     *  from the request itself.  This may return null
-     *  if no locale is determined.
-     *
-     **/
+     * Determines the {@link Locale} for the incoming request. This is determined from the locale cookie or, if not set,
+     * from the request itself.  This may return null if no locale is determined.
+     */
 
     protected Locale getLocaleFromRequest(RequestContext context) throws ServletException
     {
@@ -414,15 +357,13 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Reads the application specification when the servlet is
-     *  first initialized.  All {@link IEngine engine instances}
-     *  will have access to the specification via the servlet.
-     * 
-     *  @see #getApplicationSpecification()
-     *  @see #constructApplicationSpecification()
-     *  @see #createResourceResolver()
+     * Reads the application specification when the servlet is first initialized.  All {@link IEngine engine instances}
+     * will have access to the specification via the servlet.
      *
-     **/
+     * @see #getApplicationSpecification()
+     * @see #constructApplicationSpecification()
+     * @see #createResourceResolver()
+     */
 
     public void init(ServletConfig config) throws ServletException
     {
@@ -436,17 +377,15 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Invoked from {@link #init(ServletConfig)} to create a resource resolver
-     *  for the servlet (which will utlimately be shared and used through the
-     *  application).
-     * 
-     *  <p>This implementation constructs a {@link DefaultResourceResolver}, subclasses
-     *  may provide a different implementation.
-     * 
-     *  @see #getResourceResolver()
-     *  @since 2.3
-     * 
-     **/
+     * Invoked from {@link #init(ServletConfig)} to create a resource resolver for the servlet (which will utlimately be
+     * shared and used through the application).
+     * <p/>
+     * <p>This implementation constructs a {@link DefaultResourceResolver}, subclasses may provide a different
+     * implementation.
+     *
+     * @see #getResourceResolver()
+     * @since 2.3
+     */
 
     protected IResourceResolver createResourceResolver() throws ServletException
     {
@@ -454,24 +393,18 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Invoked from {@link #init(ServletConfig)} to read and construct
-     *  the {@link ApplicationSpecification} for this servlet.
-     *  Invokes {@link #getApplicationSpecificationPath()}, opens
-     *  the resource as a stream, then invokes
-     *  {@link #parseApplicationSpecification(IResourceLocation)}.
-     * 
-     *  <p>
-     *  This method exists to be overriden in
-     *  applications where the application specification cannot be
-     *  loaded from the classpath.  Alternately, a subclass
-     *  could override this method, invoke this implementation,
-     *  and then add additional data to it (for example, an application
-     *  where some of the pages are defined in an external source
-     *  such as a database).
-     *  
-     *  @since 2.2
-     * 
-     **/
+     * Invoked from {@link #init(ServletConfig)} to read and construct the {@link ApplicationSpecification} for this
+     * servlet. Invokes {@link #getApplicationSpecificationPath()}, opens the resource as a stream, then invokes {@link
+     * #parseApplicationSpecification(IResourceLocation)}.
+     * <p/>
+     * <p/>
+     * This method exists to be overriden in applications where the application specification cannot be loaded from the
+     * classpath.  Alternately, a subclass could override this method, invoke this implementation, and then add
+     * additional data to it (for example, an application where some of the pages are defined in an external source such
+     * as a database).
+     *
+     * @since 2.2
+     */
 
     protected IApplicationSpecification constructApplicationSpecification() throws ServletException
     {
@@ -492,24 +425,16 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Gets the location of the application specification, if there is one.
-     *  
-     *  <ul>
-     *  <li>Invokes {@link #getApplicationSpecificationPath()} to get the
-     *  location of the application specification on the classpath.
-     *  <li>If that return null, search for the application specification:
-     *  <ul>
-     *  <li><i>name</i>.application in /WEB-INF/<i>name</i>/
-     *  <li><i>name</i>.application in /WEB-INF/
-     *  </ul>
-     *  </ul>
-     * 
-     *  <p>Returns the location of the application specification, or null
-     *  if not found.
-     * 
-     *  @since 3.0
-     * 
-     **/
+     * Gets the location of the application specification, if there is one.
+     * <p/>
+     * <ul> <li>Invokes {@link #getApplicationSpecificationPath()} to get the location of the application specification
+     * on the classpath. <li>If that return null, search for the application specification: <ul>
+     * <li><i>name</i>.application in /WEB-INF/<i>name</i>/ <li><i>name</i>.application in /WEB-INF/ </ul> </ul>
+     * <p/>
+     * <p>Returns the location of the application specification, or null if not found.
+     *
+     * @since 3.0
+     */
 
     protected IResourceLocation getApplicationSpecificationLocation() throws ServletException
     {
@@ -533,12 +458,10 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Checks for the application specification relative to the specified
-     *  location.
-     * 
-     *  @since 3.0
-     * 
-     **/
+     * Checks for the application specification relative to the specified location.
+     *
+     * @since 3.0
+     */
 
     private IResourceLocation check(IResourceLocation location, String name)
     {
@@ -557,21 +480,19 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Invoked from {@link #constructApplicationSpecification()} when
-     *  the application doesn't have an explicit specification.  A
-     *  simple specification is constructed and returned.  This is useful
-     *  for minimal applications and prototypes.
-     * 
-     *  @since 3.0
-     * 
-     **/
+     * Invoked from {@link #constructApplicationSpecification()} when the application doesn't have an explicit
+     * specification.  A simple specification is constructed and returned.  This is useful for minimal applications and
+     * prototypes.
+     *
+     * @since 3.0
+     */
 
     protected IApplicationSpecification constructStandinSpecification()
     {
         ApplicationSpecification result = new ApplicationSpecification();
 
         IResourceLocation virtualLocation =
-            new ContextResourceLocation(getServletContext(), "/WEB-INF/");
+                new ContextResourceLocation(getServletContext(), "/WEB-INF/");
 
         result.setSpecificationLocation(virtualLocation);
 
@@ -582,16 +503,14 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Invoked from {@link #constructApplicationSpecification()} to
-     *  actually parse the stream (with content provided from the path)
-     *  and convert it into an {@link ApplicationSpecification}.
-     * 
-     *  @since 2.2
-     * 
-     **/
+     * Invoked from {@link #constructApplicationSpecification()} to actually parse the stream (with content provided
+     * from the path) and convert it into an {@link ApplicationSpecification}.
+     *
+     * @since 2.2
+     */
 
     protected IApplicationSpecification parseApplicationSpecification(IResourceLocation location)
-        throws ServletException
+            throws ServletException
     {
         try
         {
@@ -604,15 +523,14 @@ public class ApplicationServlet extends HttpServlet
             show(ex);
 
             throw new ServletException(
-                Tapestry.format("ApplicationServlet.could-not-parse-spec", location),
-                ex);
+                    Tapestry.format("ApplicationServlet.could-not-parse-spec", location),
+                    ex);
         }
     }
 
     /**
-     *  Closes the stream, ignoring any exceptions.
-     * 
-     **/
+     * Closes the stream, ignoring any exceptions.
+     */
 
     protected void close(InputStream stream)
     {
@@ -628,18 +546,15 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Reads the servlet init parameter
-     *  <code>org.apache.tapestry.application-specification</code>, which
-     *  is the location, on the classpath, of the application specification.
+     * Reads the servlet init parameter <code>org.apache.tapestry.application-specification</code>, which is the
+     * location, on the classpath, of the application specification.
+     * <p/>
+     * <p/>
+     * If the parameter is not set, this method returns null, and a search for the application specification within the
+     * servlet context will begin.
      *
-     *  <p>
-     *  If the parameter is not set, this method returns null, and a search
-     *  for the application specification within the servlet context
-     *  will begin.
-     * 
-     *  @see #getApplicationSpecificationLocation()
-     * 
-     **/
+     * @see #getApplicationSpecificationLocation()
+     */
 
     protected String getApplicationSpecificationPath() throws ServletException
     {
@@ -647,17 +562,13 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Invoked by {@link #getEngine(RequestContext)} to create
-     *  the {@link IEngine} instance specific to the
-     *  application, if not already in the
-     *  {@link HttpSession}.
+     * Invoked by {@link #getEngine(RequestContext)} to create the {@link IEngine} instance specific to the application,
+     * if not already in the {@link HttpSession}.
+     * <p/>
+     * <p>The {@link IEngine} instance returned is stored into the {@link HttpSession}.
      *
-     *  <p>The {@link IEngine} instance returned is stored into the
-     *  {@link HttpSession}.
-     *
-     *  @see #getEngineClassName()    
-     *
-     **/
+     * @see #getEngineClassName()
+     */
 
     protected IEngine createEngine(RequestContext context) throws ServletException
     {
@@ -684,19 +595,12 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     * 
-     *  Returns the name of the class to use when instantiating
-     *  an engine instance for this application.  
-     *  If the application specification
-     *  provides a value, this is returned.  Otherwise, a search for
-     *  the configuration property 
-     *  <code>org.apache.tapestry.engine-class</code>
-     *  occurs (see {@link #searchConfiguration(String)}).
-     * 
-     *  <p>If the search is still unsuccessful, then
-     *  {@link org.apache.tapestry.engine.BaseEngine} is used.
-     * 
-     **/
+     * Returns the name of the class to use when instantiating an engine instance for this application. If the
+     * application specification provides a value, this is returned.  Otherwise, a search for the configuration property
+     * <code>org.apache.tapestry.engine-class</code> occurs (see {@link #searchConfiguration(String)}).
+     * <p/>
+     * <p>If the search is still unsuccessful, then {@link org.apache.tapestry.engine.BaseEngine} is used.
+     */
 
     protected String getEngineClassName()
     {
@@ -715,48 +619,30 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Searches for a configuration property in:
-     *  <ul>
-     *  <li>The servlet's initial parameters
-     *  <li>The servlet context's initial parameters
-     *  <li>JVM system properties
-     *  </ul>
-     * 
-     *  @see #createPropertySource()
-     *  @since 3.0
-     * 
-     **/
+     * Searches for a configuration property in: <ul> <li>The servlet's initial parameters <li>The servlet context's
+     * initial parameters <li>JVM system properties </ul>
+     *
+     * @see #createPropertySource()
+     * @since 3.0
+     */
 
     protected String searchConfiguration(String propertyName)
     {
-        if (_propertySource == null)
+        synchronized (this)
         {
-            _lock.lock();
-
-            try
-            {
-                if (_propertySource == null)
-                {
-                    _propertySource = createPropertySource();
-                }
-            } finally
-            {
-                _lock.unlock();
-            }
+            if (_propertySource == null)
+                _propertySource = createPropertySource();
         }
 
         return _propertySource.getPropertyValue(propertyName);
     }
 
     /**
-     *  Creates an instance of {@link IPropertySource} used for
-     *  searching of configuration values.  Subclasses may override
-     *  this method if they want to change the normal locations
-     *  that properties are searched for within.
-     * 
-     *  @since 3.0
-     * 
-     **/
+     * Creates an instance of {@link IPropertySource} used for searching of configuration values.  Subclasses may
+     * override this method if they want to change the normal locations that properties are searched for within.
+     *
+     * @since 3.0
+     */
 
     protected IPropertySource createPropertySource()
     {
@@ -770,16 +656,14 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Invoked from the {@link IEngine engine}, just prior to starting to
-     *  render a response, when the locale has changed.  The servlet writes a
-     *  {@link Cookie} so that, on subsequent request cycles, an engine localized
-     *  to the selected locale is chosen.
+     * Invoked from the {@link IEngine engine}, just prior to starting to render a response, when the locale has
+     * changed.  The servlet writes a {@link Cookie} so that, on subsequent request cycles, an engine localized to the
+     * selected locale is chosen.
+     * <p/>
+     * <p>At this time, the cookie is <em>not</em> persistent.  That may change in subsequent releases.
      *
-     *  <p>At this time, the cookie is <em>not</em> persistent.  That may
-     *  change in subsequent releases.
-     *
-     *  @since 1.0.1
-     **/
+     * @since 1.0.1
+     */
 
     public void writeLocaleCookie(Locale locale, IEngine engine, RequestContext cycle)
     {
@@ -793,14 +677,11 @@ public class ApplicationServlet extends HttpServlet
     }
 
     /**
-     *  Returns a resource resolver that can access classes and resources related
-     *  to the current web application context.  Relies on
-     *  {@link java.lang.Thread#getContextClassLoader()}, which is set by
-     *  most modern servlet containers.
-     * 
-     *  @since 2.3
+     * Returns a resource resolver that can access classes and resources related to the current web application context.
+     * Relies on {@link java.lang.Thread#getContextClassLoader()}, which is set by most modern servlet containers.
      *
-     **/
+     * @since 2.3
+     */
 
     public IResourceResolver getResourceResolver()
     {
@@ -809,6 +690,7 @@ public class ApplicationServlet extends HttpServlet
 
     /**
      * Ensures that shared janitor thread is terminated.
+     *
      * @see javax.servlet.Servlet#destroy()
      * @since 3.0.3
      */

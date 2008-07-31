@@ -29,7 +29,8 @@ import java.util.Map;
 /**
  * @since 4.0
  */
-public class ExpressionEvaluatorImpl implements ExpressionEvaluator {
+public class ExpressionEvaluatorImpl implements ExpressionEvaluator
+{
 
     private static final long POOL_MIN_IDLE_TIME = 1000 * 60 * 50;
 
@@ -72,7 +73,8 @@ public class ExpressionEvaluatorImpl implements ExpressionEvaluator {
     void initializeService()
     {
         if (_applicationSpecification.checkExtension(Tapestry.OGNL_TYPE_CONVERTER))
-            _typeConverter = (TypeConverter) _applicationSpecification.getExtension(Tapestry.OGNL_TYPE_CONVERTER, TypeConverter.class);
+            _typeConverter = (TypeConverter) _applicationSpecification.getExtension(Tapestry.OGNL_TYPE_CONVERTER,
+                                                                                    TypeConverter.class);
 
         _defaultContext = Ognl.createDefaultContext(null, _ognlResolver, _typeConverter);
 
@@ -88,17 +90,19 @@ public class ExpressionEvaluatorImpl implements ExpressionEvaluator {
 
     public Node parse(Object target, String expression)
     {
-        Node node = (Node)_expressionCache.get(target, expression);
+        Node node = (Node) _expressionCache.get(target, expression);
 
         if (node == null)
         {
             try
             {
-                node = (Node)Ognl.parseExpression(expression);
+                node = (Node) Ognl.parseExpression(expression);
                 _expressionCache.cache(target, expression, node);
-            } catch (OgnlException ex)
+            }
+            catch (OgnlException ex)
             {
-                throw new ApplicationRuntimeException(Tapestry.format("unable-to-read-expression", expression, target, ex), target, null, ex);
+                throw new ApplicationRuntimeException(
+                        Tapestry.format("unable-to-read-expression", expression, target, ex), target, null, ex);
             }
         }
 
@@ -120,33 +124,57 @@ public class ExpressionEvaluatorImpl implements ExpressionEvaluator {
         OgnlContext context = null;
         try
         {
-            context = (OgnlContext)_contextPool.borrowObject();
+            context = (OgnlContext) _contextPool.borrowObject();
             context.setRoot(target);
-            
+
             return Ognl.getValue(expression, context, target);
         }
         catch (Exception ex)
         {
-            throw new ApplicationRuntimeException(Tapestry.format("unable-to-read-expression", expression, target, ex), target, null, ex);
-        } finally {
-            try { if (context != null) _contextPool.returnObject(context); } catch (Exception e) {}
+            throw new ApplicationRuntimeException(Tapestry.format("unable-to-read-expression", expression, target, ex),
+                                                  target, null, ex);
+        }
+        finally
+        {
+            discardContext(context);
+        }
+    }
+
+    /**
+     * Invoked from various finally blocks to discard a OgnlContext used during an operation.
+     */
+    private void discardContext(OgnlContext context)
+    {
+        if (context == null) return;
+
+        try
+        {
+            _contextPool.returnObject(context);
+        }
+        catch (Exception ex)
+        {
+            // Ignored.  Should be logged?
         }
     }
 
     public Object read(Object target, ExpressionAccessor expression)
     {
         OgnlContext context = null;
+
         try
         {
-            context = (OgnlContext)_contextPool.borrowObject();
+            context = (OgnlContext) _contextPool.borrowObject();
 
             return expression.get(context, target);
         }
         catch (Exception ex)
         {
-            throw new ApplicationRuntimeException(Tapestry.format("unable-to-read-expression", expression, target, ex), target, null, ex);
-        } finally {
-            try { if (context != null) _contextPool.returnObject(context); } catch (Exception e) {}
+            throw new ApplicationRuntimeException(Tapestry.format("unable-to-read-expression", expression, target, ex),
+                                                  target, null, ex);
+        }
+        finally
+        {
+            discardContext(context);
         }
     }
 
@@ -160,7 +188,7 @@ public class ExpressionEvaluatorImpl implements ExpressionEvaluator {
         OgnlContext context = null;
         try
         {
-            context = (OgnlContext)_contextPool.borrowObject();
+            context = (OgnlContext) _contextPool.borrowObject();
 
             // set up context
             context.setRoot(target);
@@ -170,10 +198,12 @@ public class ExpressionEvaluatorImpl implements ExpressionEvaluator {
         catch (Exception ex)
         {
             throw new ApplicationRuntimeException(Tapestry.format("unable-to-write-expression",
-                                                                  new Object[] {expression, target, value, ex}),
+                                                                  new Object[]{expression, target, value, ex}),
                                                   target, null, ex);
-        } finally {
-            try { if (context != null) _contextPool.returnObject(context); } catch (Exception e) {}
+        }
+        finally
+        {
+            discardContext(context);
         }
     }
 
@@ -182,17 +212,19 @@ public class ExpressionEvaluatorImpl implements ExpressionEvaluator {
         OgnlContext context = null;
         try
         {
-            context = (OgnlContext)_contextPool.borrowObject();
+            context = (OgnlContext) _contextPool.borrowObject();
 
             Ognl.setValue(expression, context, target, value);
         }
         catch (Exception ex)
         {
             throw new ApplicationRuntimeException(Tapestry.format("unable-to-write-expression",
-                                                                  new Object[] {expression, target, value, ex}),
+                                                                  new Object[]{expression, target, value, ex}),
                                                   target, null, ex);
-        } finally {
-            try { if (context != null) _contextPool.returnObject(context); } catch (Exception e) {}
+        }
+        finally
+        {
+            discardContext(context);
         }
     }
 
@@ -218,10 +250,10 @@ public class ExpressionEvaluatorImpl implements ExpressionEvaluator {
     public void compileExpression(Object target, Node node, String expression)
     {
         OgnlContext context = null;
-        
+
         try
         {
-            context = (OgnlContext)_contextPool.borrowObject();
+            context = (OgnlContext) _contextPool.borrowObject();
 
             // set up context
             context.setRoot(target);
@@ -230,11 +262,15 @@ public class ExpressionEvaluatorImpl implements ExpressionEvaluator {
 
             _expressionCache.cache(target, expression, node);
 
-        } catch (Exception ex)
+        }
+        catch (Exception ex)
         {
-            throw new ApplicationRuntimeException(Tapestry.format("unable-to-read-expression", expression, target, ex), target, null, ex);
-        } finally {
-            try { if (context != null) _contextPool.returnObject(context); } catch (Exception e) {}
+            throw new ApplicationRuntimeException(Tapestry.format("unable-to-read-expression", expression, target, ex),
+                                                  target, null, ex);
+        }
+        finally
+        {
+            discardContext(context);
         }
     }
 
@@ -246,7 +282,9 @@ public class ExpressionEvaluatorImpl implements ExpressionEvaluator {
 
             OgnlRuntime.clearCache();
             Introspector.flushCaches();
-        } catch (Exception et) {
+        }
+        catch (Exception et)
+        {
             // ignore
         }
     }

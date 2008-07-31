@@ -20,7 +20,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.tapestry.binding.ExpressionBinding;
 import org.apache.tapestry.binding.StaticBinding;
 import org.apache.tapestry.binding.StringBinding;
-import org.apache.tapestry.engine.ExpressionEvaluator;
 import org.apache.tapestry.engine.IPageLoader;
 import org.apache.tapestry.engine.IPageSource;
 import org.apache.tapestry.engine.ITemplateSource;
@@ -34,16 +33,14 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- *  Utility class instantiated by {@link org.apache.tapestry.BaseComponent} to
- *  process the component's {@link org.apache.tapestry.parse.ComponentTemplate template},
- *  which involves working through the nested structure of the template and hooking
- *  the various static template blocks and components together using
- *  {@link IComponent#addBody(IRender)} and 
- *  {@link org.apache.tapestry.BaseComponent#addOuter(IRender)}.
+ * Utility class instantiated by {@link org.apache.tapestry.BaseComponent} to process the component's {@link
+ * org.apache.tapestry.parse.ComponentTemplate template}, which involves working through the nested structure of the
+ * template and hooking the various static template blocks and components together using {@link
+ * IComponent#addBody(IRender)} and {@link org.apache.tapestry.BaseComponent#addOuter(IRender)}.
  *
- *  @author Howard Lewis Ship
- *  @version $Id$
- *  @since 3.0
+ * @author Howard Lewis Ship
+ * @version $Id$
+ * @since 3.0
  */
 
 public class BaseComponentTemplateLoader
@@ -58,12 +55,10 @@ public class BaseComponentTemplateLoader
     private IComponent[] _stack;
     private int _stackx = 0;
     private IComponent _activeComponent = null;
-    private ExpressionEvaluator _evaluator;
     private Set _seenIds = new HashSet();
 
     /**
-     *  A class used with invisible localizations.  Constructed
-     *  from a {@link TextToken}.
+     * A class used with invisible localizations.  Constructed from a {@link TextToken}.
      */
 
     private static class LocalizedStringRender implements IRender
@@ -130,11 +125,11 @@ public class BaseComponentTemplateLoader
     }
 
     public BaseComponentTemplateLoader(
-        IRequestCycle requestCycle,
-        IPageLoader pageLoader,
-        BaseComponent loadComponent,
-        ComponentTemplate template,
-        IPageSource pageSource)
+            IRequestCycle requestCycle,
+            IPageLoader pageLoader,
+            BaseComponent loadComponent,
+            ComponentTemplate template,
+            IPageSource pageSource)
     {
         _requestCycle = requestCycle;
         _pageLoader = pageLoader;
@@ -185,21 +180,20 @@ public class BaseComponentTemplateLoader
 
         if (_stackx != 0)
             throw new ApplicationRuntimeException(
-                Tapestry.getMessage("BaseComponent.unbalance-open-tags"),
-                _loadComponent,
-                null,
-                null);
+                    Tapestry.getMessage("BaseComponent.unbalance-open-tags"),
+                    _loadComponent,
+                    null,
+                    null);
 
         checkAllComponentsReferenced();
     }
 
     /**
-     *  Adds the token (which implements {@link IRender})
-     *  to the active component (using {@link IComponent#addBody(IRender)}),
-     *  or to this component {@link BaseComponent#addOuter(IRender)}.
-     * 
-     *  <p>
-     *  A check is made that the active component allows a body.
+     * Adds the token (which implements {@link IRender}) to the active component (using {@link
+     * IComponent#addBody(IRender)}), or to this component {@link BaseComponent#addOuter(IRender)}.
+     * <p/>
+     * <p/>
+     * A check is made that the active component allows a body.
      */
 
     private void process(TextToken token)
@@ -235,13 +229,13 @@ public class BaseComponentTemplateLoader
 
         if (_seenIds.contains(id))
             throw new ApplicationRuntimeException(
-                Tapestry.format(
-                    "BaseComponent.multiple-component-references",
-                    _loadComponent.getExtendedId(),
-                    id),
-                _loadComponent,
-                token.getLocation(),
-                null);
+                    Tapestry.format(
+                            "BaseComponent.multiple-component-references",
+                            _loadComponent.getExtendedId(),
+                            id),
+                    _loadComponent,
+                    token.getLocation(),
+                    null);
 
         _seenIds.add(id);
 
@@ -274,25 +268,25 @@ public class BaseComponentTemplateLoader
 
         if (cc != null)
             throw new ApplicationRuntimeException(
-                Tapestry.format(
-                    "BaseComponentTemplateLoader.dupe-component-id",
-                    id,
+                    Tapestry.format(
+                            "BaseComponentTemplateLoader.dupe-component-id",
+                            id,
+                            location,
+                            cc.getLocation()),
+                    _loadComponent,
                     location,
-                    cc.getLocation()),
-                _loadComponent,
-                location,
-                null);
+                    null);
     }
 
     private IComponent createImplicitComponent(String id, String componentType, ILocation location)
     {
         IComponent result =
-            _pageLoader.createImplicitComponent(
-                _requestCycle,
-                _loadComponent,
-                id,
-                componentType,
-                location);
+                _pageLoader.createImplicitComponent(
+                        _requestCycle,
+                        _loadComponent,
+                        id,
+                        componentType,
+                        location);
 
         return result;
     }
@@ -309,10 +303,10 @@ public class BaseComponentTemplateLoader
 
         if (_stackx <= 0)
             throw new ApplicationRuntimeException(
-                Tapestry.getMessage("BaseComponent.unbalanced-close-tags"),
-                _loadComponent,
-                token.getLocation(),
-                null);
+                    Tapestry.getMessage("BaseComponent.unbalanced-close-tags"),
+                    _loadComponent,
+                    token.getLocation(),
+                    null);
 
         // Null and forget the top element on the stack.
 
@@ -332,7 +326,7 @@ public class BaseComponentTemplateLoader
     }
 
     /**
-     *  Adds bindings based on attributes in the template.
+     * Adds bindings based on attributes in the template.
      */
 
     private void addTemplateBindings(IComponent component, OpenToken token)
@@ -356,32 +350,32 @@ public class BaseComponentTemplateLoader
                 if (type == AttributeType.OGNL_EXPRESSION)
                 {
                     addExpressionBinding(
-                        component,
-                        spec,
-                        name,
-                        attribute.getValue(),
-                        token.getLocation());
+                            component,
+                            spec,
+                            name,
+                            attribute.getValue(),
+                            token.getLocation());
                     continue;
                 }
 
                 if (type == AttributeType.LOCALIZATION_KEY)
                 {
                     addStringBinding(
-                        component,
-                        spec,
-                        name,
-                        attribute.getValue(),
-                        token.getLocation());
+                            component,
+                            spec,
+                            name,
+                            attribute.getValue(),
+                            token.getLocation());
                     continue;
                 }
 
                 if (type == AttributeType.LITERAL)
                     addStaticBinding(
-                        component,
-                        spec,
-                        name,
-                        attribute.getValue(),
-                        token.getLocation());
+                            component,
+                            spec,
+                            name,
+                            attribute.getValue(),
+                            token.getLocation());
             }
         }
 
@@ -389,33 +383,30 @@ public class BaseComponentTemplateLoader
         // there is no established binding for that parameter, 
         // add a static binding carrying the template tag  
         if (spec.getParameter(ITemplateSource.TEMPLATE_TAG_PARAMETER_NAME) != null
-            && component.getBinding(ITemplateSource.TEMPLATE_TAG_PARAMETER_NAME) == null)
+                && component.getBinding(ITemplateSource.TEMPLATE_TAG_PARAMETER_NAME) == null)
         {
             addStaticBinding(
-                component,
-                spec,
-                ITemplateSource.TEMPLATE_TAG_PARAMETER_NAME,
-                token.getTag(),
-                token.getLocation());
+                    component,
+                    spec,
+                    ITemplateSource.TEMPLATE_TAG_PARAMETER_NAME,
+                    token.getTag(),
+                    token.getLocation());
         }
 
     }
 
     /**
-     *  Adds an expression binding, checking for errors related
-     *  to reserved and informal parameters.
-     *
-     *  <p>It is an error to specify expression 
-     *  bindings in both the specification
-     *  and the template.
+     * Adds an expression binding, checking for errors related to reserved and informal parameters.
+     * <p/>
+     * <p>It is an error to specify expression bindings in both the specification and the template.
      */
 
     private void addExpressionBinding(
-        IComponent component,
-        IComponentSpecification spec,
-        String name,
-        String expression,
-        ILocation location)
+            IComponent component,
+            IComponentSpecification spec,
+            String name,
+            String expression,
+            ILocation location)
     {
 
         // If matches a formal parameter name, allow it to be set
@@ -427,68 +418,65 @@ public class BaseComponentTemplateLoader
         {
             if (component.getBinding(name) != null)
                 throw new ApplicationRuntimeException(
-                    Tapestry.format(
-                        "BaseComponent.dupe-template-expression",
-                        name,
-                        component.getExtendedId(),
-                        _loadComponent.getExtendedId()),
-                    component,
-                    location,
-                    null);
+                        Tapestry.format(
+                                "BaseComponent.dupe-template-expression",
+                                name,
+                                component.getExtendedId(),
+                                _loadComponent.getExtendedId()),
+                        component,
+                        location,
+                        null);
         }
         else
         {
             if (!spec.getAllowInformalParameters())
                 throw new ApplicationRuntimeException(
-                    Tapestry.format(
-                        "BaseComponent.template-expression-for-informal-parameter",
-                        name,
-                        component.getExtendedId(),
-                        _loadComponent.getExtendedId()),
-                    component,
-                    location,
-                    null);
+                        Tapestry.format(
+                                "BaseComponent.template-expression-for-informal-parameter",
+                                name,
+                                component.getExtendedId(),
+                                _loadComponent.getExtendedId()),
+                        component,
+                        location,
+                        null);
 
             // If the name is reserved (matches a formal parameter
             // or reserved name, caselessly), then skip it.
 
             if (spec.isReservedParameterName(name))
                 throw new ApplicationRuntimeException(
-                    Tapestry.format(
-                        "BaseComponent.template-expression-for-reserved-parameter",
-                        name,
-                        component.getExtendedId(),
-                        _loadComponent.getExtendedId()),
-                    component,
-                    location,
-                    null);
+                        Tapestry.format(
+                                "BaseComponent.template-expression-for-reserved-parameter",
+                                name,
+                                component.getExtendedId(),
+                                _loadComponent.getExtendedId()),
+                        component,
+                        location,
+                        null);
         }
 
         IBinding binding =
-            new ExpressionBinding(
-                _pageSource.getResourceResolver(),
-                _loadComponent,
-                expression,
-                location);
+                new ExpressionBinding(
+                        _pageSource.getResourceResolver(),
+                        _loadComponent,
+                        expression,
+                        location);
 
         component.setBinding(name, binding);
     }
 
     /**
-      *  Adds an expression binding, checking for errors related
-      *  to reserved and informal parameters.
-      *
-      *  <p>It is an error to specify expression 
-      *  bindings in both the specification
-      *  and the template.
-      */
+     * Adds an expression binding, checking for errors related to reserved and informal parameters.
+     * <p/>
+     * <p>It is an error to specify expression bindings in both the specification and the template.
+     */
 
     private void addStringBinding(
-        IComponent component,
-        IComponentSpecification spec,
-        String name,
-        String localizationKey,
-        ILocation location)
+            IComponent component,
+            IComponentSpecification spec,
+            String name,
+            String localizationKey,
+            ILocation location)
     {
         // If matches a formal parameter name, allow it to be set
         // unless there's already a binding.
@@ -499,41 +487,41 @@ public class BaseComponentTemplateLoader
         {
             if (component.getBinding(name) != null)
                 throw new ApplicationRuntimeException(
-                    Tapestry.format(
-                        "BaseComponent.dupe-string",
-                        name,
-                        component.getExtendedId(),
-                        _loadComponent.getExtendedId()),
-                    component,
-                    location,
-                    null);
+                        Tapestry.format(
+                                "BaseComponent.dupe-string",
+                                name,
+                                component.getExtendedId(),
+                                _loadComponent.getExtendedId()),
+                        component,
+                        location,
+                        null);
         }
         else
         {
             if (!spec.getAllowInformalParameters())
                 throw new ApplicationRuntimeException(
-                    Tapestry.format(
-                        "BaseComponent.template-expression-for-informal-parameter",
-                        name,
-                        component.getExtendedId(),
-                        _loadComponent.getExtendedId()),
-                    component,
-                    location,
-                    null);
+                        Tapestry.format(
+                                "BaseComponent.template-expression-for-informal-parameter",
+                                name,
+                                component.getExtendedId(),
+                                _loadComponent.getExtendedId()),
+                        component,
+                        location,
+                        null);
 
             // If the name is reserved (matches a formal parameter
             // or reserved name, caselessly), then skip it.
 
             if (spec.isReservedParameterName(name))
                 throw new ApplicationRuntimeException(
-                    Tapestry.format(
-                        "BaseComponent.template-expression-for-reserved-parameter",
-                        name,
-                        component.getExtendedId(),
-                        _loadComponent.getExtendedId()),
-                    component,
-                    location,
-                    null);
+                        Tapestry.format(
+                                "BaseComponent.template-expression-for-reserved-parameter",
+                                name,
+                                component.getExtendedId(),
+                                _loadComponent.getExtendedId()),
+                        component,
+                        location,
+                        null);
         }
 
         IBinding binding = new StringBinding(_loadComponent, localizationKey, location);
@@ -542,20 +530,18 @@ public class BaseComponentTemplateLoader
     }
 
     /**
-     *  Adds a static binding, checking for errors related
-     *  to reserved and informal parameters.
-     * 
-     *  <p>
-     *  Static bindings that conflict with bindings in the
-     *  specification are quietly ignored.
+     * Adds a static binding, checking for errors related to reserved and informal parameters.
+     * <p/>
+     * <p/>
+     * Static bindings that conflict with bindings in the specification are quietly ignored.
      */
 
     private void addStaticBinding(
-        IComponent component,
-        IComponentSpecification spec,
-        String name,
-        String staticValue,
-        ILocation location)
+            IComponent component,
+            IComponentSpecification spec,
+            String name,
+            String staticValue,
+            ILocation location)
     {
 
         if (component.getBinding(name) != null)
@@ -609,12 +595,12 @@ public class BaseComponentTemplateLoader
         int count = ids.size();
 
         String key =
-            (count == 1)
+                (count == 1)
                 ? "BaseComponent.missing-component-spec-single"
                 : "BaseComponent.missing-component-spec-multi";
 
         StringBuffer buffer =
-            new StringBuffer(Tapestry.format(key, _loadComponent.getExtendedId()));
+                new StringBuffer(Tapestry.format(key, _loadComponent.getExtendedId()));
 
         Iterator i = ids.iterator();
         int j = 1;
@@ -623,15 +609,14 @@ public class BaseComponentTemplateLoader
         {
             if (j == 1)
                 buffer.append(' ');
+            else if (j == count)
+            {
+                buffer.append(' ');
+                buffer.append(Tapestry.getMessage("BaseComponent.and"));
+                buffer.append(' ');
+            }
             else
-                if (j == count)
-                {
-                    buffer.append(' ');
-                    buffer.append(Tapestry.getMessage("BaseComponent.and"));
-                    buffer.append(' ');
-                }
-                else
-                    buffer.append(", ");
+                buffer.append(", ");
 
             buffer.append(i.next());
 
@@ -646,9 +631,9 @@ public class BaseComponentTemplateLoader
     protected ApplicationRuntimeException createBodylessComponentException(IComponent component)
     {
         return new ApplicationRuntimeException(
-            Tapestry.getMessage("BaseComponentTemplateLoader.bodyless-component"),
-            component,
-            null,
-            null);
+                Tapestry.getMessage("BaseComponentTemplateLoader.bodyless-component"),
+                component,
+                null,
+                null);
     }
 }

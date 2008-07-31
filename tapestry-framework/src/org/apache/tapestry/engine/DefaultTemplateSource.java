@@ -15,7 +15,6 @@
 package org.apache.tapestry.engine;
 
 import edu.emory.mathcs.backport.java.util.concurrent.ConcurrentHashMap;
-import edu.emory.mathcs.backport.java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,21 +34,17 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- *  Default implementation of {@link ITemplateSource}.  Templates, once parsed,
- *  stay in memory until explicitly cleared.
+ * Default implementation of {@link ITemplateSource}.  Templates, once parsed, stay in memory until explicitly cleared.
+ * <p/>
+ * <p>An instance of this class acts as a singleton shared by all sessions, so it must be threadsafe.
  *
- *  <p>An instance of this class acts as a singleton shared by all sessions, so it
- *  must be threadsafe.
- *
- *  @author Howard Lewis Ship
- *  @version $Id$
- *
- **/
+ * @author Howard Lewis Ship
+ * @version $Id$
+ */
 
 public class DefaultTemplateSource implements ITemplateSource, IRenderDescription
 {
     private static final Log LOG = LogFactory.getLog(DefaultTemplateSource.class);
-
 
     // The name of the component/application/etc property that will be used to
     // determine the encoding to use when loading the template
@@ -60,20 +55,18 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     // specification resource path and locale (local may be null), value
     // is the ComponentTemplate.
 
-    private Map _cache = new ConcurrentHashMap();
+    private final Map _cache = new ConcurrentHashMap();
 
     // Previously read templates; key is the IResourceLocation, value
     // is the ComponentTemplate.
 
-    private Map _templates = new ConcurrentHashMap();
+    private final Map _templates = new ConcurrentHashMap();
 
-    // Used to synchronize access to specific templates
-    private ConcurrentHashMap _lockCache = new ConcurrentHashMap();
+    private final ResourceLockManager _resourceLockManager = new ResourceLockManager();
 
     /**
-     *  Number of tokens (each template contains multiple tokens).
-     *
-     **/
+     * Number of tokens (each template contains multiple tokens).
+     */
 
     private int _tokenCount;
 
@@ -81,34 +74,36 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
 
     private TemplateParser _parser;
 
-    /** @since 2.2 **/
+    /**
+     * @since 2.2 *
+     */
 
     private IResourceLocation _applicationRootLocation;
 
-    /** @since 3.0 **/
+    /**
+     * @since 3.0 *
+     */
 
     private ITemplateSourceDelegate _delegate;
 
     /**
-     *  Clears the template cache.  This is used during debugging.
-     *
-     **/
+     * Clears the template cache.  This is used during debugging.
+     */
 
     public void reset()
     {
         _cache.clear();
         _templates.clear();
-        _lockCache.clear();
+        _resourceLockManager.clear();
 
         _tokenCount = 0;
     }
 
     /**
-     *  Reads the template for the component.
-     *
-     *  <p>Returns null if the template can't be found.
-     *
-     **/
+     * Reads the template for the component.
+     * <p/>
+     * <p>Returns null if the template can't be found.
+     */
 
     public ComponentTemplate getTemplate(IRequestCycle cycle, IComponent component)
     {
@@ -117,17 +112,14 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
 
         Locale locale = component.getPage().getLocale();
 
-        Object key = new MultiKey(new Object[] { specificationLocation, locale }, false);
+        Object key = new MultiKey(new Object[]{specificationLocation, locale}, false);
 
         ComponentTemplate result = searchCache(key);
         if (result != null)
             return result;
 
-        _lockCache.putIfAbsent(key, new ReentrantLock());
+        _resourceLockManager.lock(key);
 
-        ReentrantLock lock = (ReentrantLock)_lockCache.get(key);
-
-        lock.lock();
         try
         {
             result = searchCache(key);
@@ -145,8 +137,8 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
 
                 String stringKey =
                         component.getSpecification().isPageSpecification()
-                                ? "DefaultTemplateSource.no-template-for-page"
-                                : "DefaultTemplateSource.no-template-for-component";
+                        ? "DefaultTemplateSource.no-template-for-page"
+                        : "DefaultTemplateSource.no-template-for-component";
 
                 throw new ApplicationRuntimeException(
                         Tapestry.format(stringKey, component.getExtendedId(), locale),
@@ -156,11 +148,14 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
             }
 
             saveToCache(key, result);
-        } finally
-        {
-            lock.unlock();
+
+            return result;
         }
-        return result;
+        finally
+        {
+            _resourceLockManager.unlock(key);
+        }
+
     }
 
     private ComponentTemplate searchCache(Object key)
@@ -198,17 +193,12 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     /**
-     *  Finds the template for the given component, using the following rules:
-     *  <ul>
-     *  <li>If the component has a $template asset, use that
-     *  <li>Look for a template in the same folder as the component
-     *  <li>If a page in the application namespace, search in the application root
-     *  <li>Fail!
-     *  </ul>
+     * Finds the template for the given component, using the following rules: <ul> <li>If the component has a $template
+     * asset, use that <li>Look for a template in the same folder as the component <li>If a page in the application
+     * namespace, search in the application root <li>Fail! </ul>
      *
-     *  @return the template, or null if not found
-     *
-     **/
+     * @return the template, or null if not found
+     */
 
     private ComponentTemplate findTemplate(
             IRequestCycle cycle,
@@ -229,8 +219,8 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
                 findStandardTemplate(cycle, location, component, templateBaseName, locale);
 
         if (result == null
-            && component.getSpecification().isPageSpecification()
-            && component.getNamespace().isApplicationNamespace())
+                && component.getSpecification().isPageSpecification()
+                && component.getNamespace().isApplicationNamespace())
             result = findPageTemplateInApplicationRoot(cycle, component, templateBaseName, locale);
 
         return result;
@@ -259,9 +249,8 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     /**
-     *  Reads an asset to get the template.
-     *
-     **/
+     * Reads an asset to get the template.
+     */
 
     private ComponentTemplate readTemplateFromAsset(
             IRequestCycle cycle,
@@ -293,13 +282,11 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     /**
-     *  Search for the template corresponding to the resource and the locale.
-     *  This may be in the template map already, or may involve reading and
-     *  parsing the template.
+     * Search for the template corresponding to the resource and the locale. This may be in the template map already, or
+     * may involve reading and parsing the template.
      *
-     *  @return the template, or null if not found.
-     *
-     **/
+     * @return the template, or null if not found.
+     */
 
     private ComponentTemplate findStandardTemplate(
             IRequestCycle cycle,
@@ -311,9 +298,9 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
         if (LOG.isDebugEnabled())
             LOG.debug(
                     "Searching for localized version of template for "
-                    + location
-                    + " in locale "
-                    + locale.getDisplayName());
+                            + location
+                            + " in locale "
+                            + locale.getDisplayName());
 
         IResourceLocation baseTemplateLocation = location.getRelativeLocation(templateBaseName);
 
@@ -327,11 +314,9 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     /**
-     *  Returns a previously parsed template at the specified location (which must already
-     *  be localized).  If not already in the template Map, then the
-     *  location is parsed and stored into the templates Map, then returned.
-     *
-     **/
+     * Returns a previously parsed template at the specified location (which must already be localized).  If not already
+     * in the template Map, then the location is parsed and stored into the templates Map, then returned.
+     */
 
     private ComponentTemplate getOrParseTemplate(
             IRequestCycle cycle,
@@ -354,12 +339,9 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     /**
-     *  Reads the template for the given resource; returns null if the
-     *  resource doesn't exist.  Note that this method is only invoked
-     *  from a synchronized block, so there shouldn't be threading
-     *  issues here.
-     *
-     **/
+     * Reads the template for the given resource; returns null if the resource doesn't exist.  Note that this method is
+     * only invoked from a synchronized block, so there shouldn't be threading issues here.
+     */
 
     private ComponentTemplate parseTemplate(
             IRequestCycle cycle,
@@ -376,12 +358,9 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     /**
-     *  This method is currently synchronized, because
-     *  {@link TemplateParser} is not threadsafe.  Another good candidate
-     *  for a pooling mechanism, especially because parsing a template
-     *  may take a while.
-     *
-     **/
+     * This method is currently synchronized, because {@link TemplateParser} is not threadsafe.  Another good candidate
+     * for a pooling mechanism, especially because parsing a template may take a while.
+     */
 
     private synchronized ComponentTemplate constructTemplateInstance(
             IRequestCycle cycle,
@@ -416,10 +395,8 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     /**
-     *  Reads the template, given the complete path to the
-     *  resource.  Returns null if the resource doesn't exist.
-     *
-     **/
+     * Reads the template, given the complete path to the resource.  Returns null if the resource doesn't exist.
+     */
 
     private char[] readTemplate(IResourceLocation location, String encoding)
     {
@@ -461,9 +438,8 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     /**
-     *  Reads a Stream into memory as an array of characters.
-     *
-     **/
+     * Reads a Stream into memory as an array of characters.
+     */
 
     private char[] readTemplateStream(InputStream stream, String encoding) throws IOException
     {
@@ -520,11 +496,10 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     }
 
     /**
-     *  Checks for the {@link Tapestry#TEMPLATE_EXTENSION_PROPERTY} in the component's
-     *  specification, then in the component's namespace's specification.  Returns
-     *  {@link Tapestry#DEFAULT_TEMPLATE_EXTENSION} if not otherwise overriden.
-     *
-     **/
+     * Checks for the {@link Tapestry#TEMPLATE_EXTENSION_PROPERTY} in the component's specification, then in the
+     * component's namespace's specification.  Returns {@link Tapestry#DEFAULT_TEMPLATE_EXTENSION} if not otherwise
+     * overriden.
+     */
 
     private String getTemplateExtension(IComponent component)
     {
@@ -544,7 +519,9 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
         return Tapestry.DEFAULT_TEMPLATE_EXTENSION;
     }
 
-    /** @since 1.0.6 **/
+    /**
+     * @since 1.0.6 *
+     */
 
     public synchronized void renderDescription(IMarkupWriter writer)
     {

@@ -14,7 +14,6 @@
 
 package org.apache.tapestry.engine;
 
-import edu.emory.mathcs.backport.java.util.concurrent.locks.ReentrantLock;
 import ognl.ClassCacheInspector;
 import ognl.Node;
 import ognl.OgnlRuntime;
@@ -27,9 +26,8 @@ import java.util.Map;
  * @author Howard M. Lewis Ship
  * @since 4.0
  */
-public class ExpressionCacheImpl implements ExpressionCache, ClassCacheInspector {
-
-    private final ReentrantLock _lock = new ReentrantLock();
+public class ExpressionCacheImpl implements ExpressionCache, ClassCacheInspector
+{
 
     private final Map _compiledExpressionCache = new HashMap();
 
@@ -50,77 +48,53 @@ public class ExpressionCacheImpl implements ExpressionCache, ClassCacheInspector
         }
     }
 
-    public void reset()
+    public synchronized void reset()
     {
-        try
-        {
-            _lock.lock();
-
-            _compiledExpressionCache.clear();
-            _expressionCache.clear();
-        } finally
-        {
-            _lock.unlock();
-        }
+        _compiledExpressionCache.clear();
+        _expressionCache.clear();
     }
 
     public boolean shouldCache(Class type)
     {
         if (!_cachingDisabled || type == null
-            || AbstractComponent.class.isAssignableFrom(type))
+                || AbstractComponent.class.isAssignableFrom(type))
             return false;
 
         return true;
     }
 
-    public Object get(Object target, String expression)
+    public synchronized Object get(Object target, String expression)
     {
-        try
+        Map cached = (Map) _compiledExpressionCache.get(target.getClass());
+        if (cached == null)
         {
-            _lock.lock();
-
-            Map cached = (Map)_compiledExpressionCache.get(target.getClass());
-            if (cached == null)
-            {
-                return _expressionCache.get(expression);
-            } else
-            {
-                return cached.get(expression);
-            }
-
-        } finally
+            return _expressionCache.get(expression);
+        }
+        else
         {
-            _lock.unlock();
+            return cached.get(expression);
         }
     }
 
-    public void cache(Object target, String expression, Node node)
+    public synchronized void cache(Object target, String expression, Node node)
     {
-        try
+        if (node.getAccessor() != null)
         {
-            _lock.lock();
+            Map cached = (Map) _compiledExpressionCache.get(target.getClass());
 
-            if (node.getAccessor() != null)
+            if (cached == null)
             {
-                Map cached = (Map)_compiledExpressionCache.get(target.getClass());
-
-                if (cached == null)
-                {
-                    cached = new HashMap();
-                    _compiledExpressionCache.put(target.getClass(), cached);
-                }
-
-                cached.put(expression, node);
-
-                _expressionCache.remove(target.getClass());
-            } else
-            {
-                _expressionCache.put(expression, node);
+                cached = new HashMap();
+                _compiledExpressionCache.put(target.getClass(), cached);
             }
 
-        } finally
+            cached.put(expression, node);
+
+            _expressionCache.remove(target.getClass());
+        }
+        else
         {
-            _lock.unlock();
+            _expressionCache.put(expression, node);
         }
     }
 }
