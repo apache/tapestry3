@@ -1,4 +1,4 @@
-//  Copyright 2004 The Apache Software Foundation
+//  Copyright 2004, 2008 The Apache Software Foundation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -60,12 +60,12 @@ public class DefaultTemplateSource implements ITemplateSource, IRenderDescriptio
     // specification resource path and locale (local may be null), value
     // is the ComponentTemplate.
 
-    private Map _cache = new ConcurrentHashMap();//Collections.synchronizedMap(new HashMap());
+    private Map _cache = new ConcurrentHashMap();
 
     // Previously read templates; key is the IResourceLocation, value
     // is the ComponentTemplate.
 
-    private Map _templates = new ConcurrentHashMap(); //Collections.synchronizedMap(new HashMap());
+    private Map _templates = new ConcurrentHashMap();
 
     // Used to synchronize access to specific templates
     private ConcurrentHashMap _lockCache = new ConcurrentHashMap();
