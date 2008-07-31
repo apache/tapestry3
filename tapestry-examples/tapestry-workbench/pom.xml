@@ -14,7 +14,7 @@
     </parent>
 
     <name>Tapestry Workbench</name>
-    <inceptionYear>2006</inceptionYear>
+    <inceptionYear>2003</inceptionYear>
 
     <dependencies>
         <dependency>
